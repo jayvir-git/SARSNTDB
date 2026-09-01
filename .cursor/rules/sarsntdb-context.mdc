@@ -1,0 +1,71 @@
+---
+description: SARSNTDB project context, setup (XAMPP/app_sarsntdb), and how to run, debug, and extend the app
+alwaysApply: true
+---
+
+# SARSNTDB Project Rule
+
+Use this context whenever working in this repository. Project assigned by Dr. Andrey Grigoriev. **Setup has been followed successfully; the project runs locally** (XAMPP, `app_sarsntdb`, `connection.php`, MySQL user matching credentials).
+
+## 1. REPOSITORY OVERVIEW
+
+- **What it is:** PHP web app for SARS-CoV-2 genomic data (genes, proteins, mutations, repeats, two-segment/sgmRNA, junction groups, reference sequences).
+- **Stack:** PHP, MySQL/MariaDB, Bootstrap 3, jQuery, CanvasJS. Python in `scripts/` for lab-table imports.
+- **This folder is both the git repo and the XAMPP site:** `C:\xampp\htdocs\SARSNTDB\`. Edits here are what Apache serves. No copy-to-htdocs step.
+- **Main URL:** http://localhost/SARSNTDB/GenomeSearch.php
+- **Nav (`Navigation.php`):** Search → Genome / Mutations / Repeats / 2-segment (sgmRNA) / Junction groups / CSV repeats vs 2-segment; Reference; Help.
+
+## 2. UNDERSTANDING THE REPO
+
+- **Data flow:** Follow `require_once` / `include`. Key files: `connection.php`, `Navigation.php`, `MutationsInfo.php`, `GenomeComparisonInfo.php`, `RepeatInfo.php`, `ProteinInfo.php`, `ProtienInfo.php` (typo in filename — keep it).
+- **Database:** Official DB name **`app_sarsntdb`**. Baseline SQL: `SARS.sql`, `gene_1_25.sql`, `cov_comp_25.sql`. Incremental/reversible SQL lives in `sql/`.
+- **Config:** Copy `connection.example.php` to `connection.php` (gitignored). `$con` is mysqli: host 127.0.0.1, user/db `app_sarsntdb`.
+- **Do not** rename `ProtienInfo.php`, merge `style.css`/`styles.css` without checking includes, or move root PHP pages into `src/`.
+
+## 3. HOW TO RUN
+
+1. XAMPP: Apache + MySQL. Project is already in `htdocs/SARSNTDB`.
+2. phpMyAdmin: DB `app_sarsntdb`; import baseline SQL then files under `sql/` as needed.
+3. `connection.php` at repo root must exist (from the example) with a matching MySQL user and privileges.
+4. Open http://localhost/SARSNTDB/GenomeSearch.php
+
+## 4. DEBUGGING
+
+- Blank/500: `connection.php`, credentials, PHP error display/logs.
+- DB errors: DB name, user, password, table names vs `SARS.sql` and `sql/`.
+- Empty results: trace queries; check GET params and JOINs (e.g. `Protein` vs `Gene`).
+- Frontend: DevTools Network tab for PHP endpoints and params.
+
+## 5. ADDING/CHANGING FEATURES
+
+- New page: include `Navigation.php`, `require_once './connection.php'`, use `$con`. Parameterized SQL.
+- New lab tables: file → `scripts/` importer → `sql/*.sql` + drop script. Do not parse xlsx in PHP on page load.
+- Keep typo `ProtienInfo.php` when adding includes. `hybrid.php` uses `conn/connection.php` and `function.php`.
+
+## 6. JIM / LAB INTAKE
+
+- Inbox: `_incoming/jim-kelley/` (spelling **kelley**). Data is gitignored except README.
+- User drops new attachments flat and pastes the email in chat. Use skill `file-jim-request`: dated packet, `REQUEST.md`, move **only new** files. Leave importer source files flat (see `_incoming/jim-kelley/README.md`).
+- Acceptance is a screenshot. Use skill `screenshot-for-jim` for the URL and capture list.
+- Do not commit `_incoming` data, transcripts, or `connection.php`.
+
+## 7. QUICK REFERENCE
+
+| Item | Location |
+|------|----------|
+| DB config | `connection.example.php` → `connection.php`; user/dbname `app_sarsntdb` |
+| Docs | `docs/README.md` |
+| Genome | `GenomeSearch.php`, `GenomeResult.php`, `GenomeDetailData.php`, `GenomeComparison*.php` |
+| Mutations | `MutationsSearch.php`, `MutationsSummary.php`, `MutationsDetail.php` |
+| Repeats | `motifvisualizer.php`, `repeatData.php`, `RepeatInfo.php` |
+| 2-segment / primers | `TwoSegmentStructures.php`, `two_segment_helpers.php`, `JS/twoSegmentViz.js` |
+| Junction groups | `JunctionGroupQuery.php`, `junction_query_helpers.php` |
+| Imports | `scripts/`, `sql/` |
+| Reference | `reference.php`, `fastas/reference.fasta` |
+
+## 8. GENOME SEQUENCE SEARCH
+
+- Start/End may be coordinates or DNA (A/T/G/C). `GenomeResult.php` `findSequenceMatches()` searches `fastas/reference.fasta` (1-based). Substring searches include hits that are part of longer matches.
+- Flow: `GenomeSearch.php` → `GenomeResult.php?Start=ACGAACTTATG` → resolve sequence, optional “Sequence Search Results”, then gene/repeat queries using first match.
+
+When asked to run, debug, or add a feature: locate entry points and data flow first, then make minimal changes.

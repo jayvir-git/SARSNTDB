@@ -1,0 +1,38 @@
+.blue {
+  background: blue;
+  color: white;
+}
+
+.larger-text {
+  font-size: 30px;
+}
+
+#repeatDisplay {
+  width: 900px;
+  height: 50px;
+  position: relative;
+  background: rgb(186, 186, 186);
+}
+
+.highlight {
+  width: 2px;
+  height: 130%;
+  background: red;
+  margin-left: 30px;
+  position: absolute;
+  margin-top: -10px;
+}
+
+.genehighlight {
+  width: 5px;
+  height: 100%;
+  background: red;
+  margin-left: 30px;
+  position: absolute;
+}
+
+#coords {
+  width: 900px;
+  display: flex; 
+  justify-content: space-between;
+}

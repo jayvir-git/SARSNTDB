@@ -1,0 +1,35 @@
+# Secrets and local MySQL config
+connection.php
+test/connection.php
+my.cnf
+mutations.sql
+sarsntdb824.sql
+
+# Jim/lab request packets — data stays local; README convention may be committed
+_incoming/*
+!_incoming/README.md
+!_incoming/jim-kelley/
+_incoming/jim-kelley/*
+!_incoming/jim-kelley/README.md
+
+# Local tools, meetings, one-off scratch
+.codex-tools/
+transcripts/
+meeting-transcript-*/
+transcribe_zoom.py
+test_coord_050626.csv
+
+# Dependencies (regenerate with npm install in scripts/)
+node_modules/
+scripts/node_modules/
+
+# OS / editor junk
+._*
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+.php
