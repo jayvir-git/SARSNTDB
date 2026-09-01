@@ -1,0 +1,93 @@
+.borderless,
+      .borderless > tbody > tr > td,
+      .borderless > tbody > tr > th,
+      .borderless > tfoot > tr > td,
+      .borderless > tfoot > tr > th,
+      .borderless > thead > tr > td,
+      .borderless > thead > tr > th {
+          border: none;
+      }
+      /*input[type=checkbox] {
+        -webkit-appearance: checkbox;
+      }*/
+
+      .genomeCanvas {
+          border: 1px solid gray;
+          background-color: #edf0f1;
+          width: 100%;
+          height: 70px;
+      }
+      .genome-div {
+          padding: 10px;
+          flex: 1;
+          /*border: 2px solid green;*/
+      }
+      .canvasDomainTooltipShow {
+        display: block;
+        border: 1px solid #a1a1d4;
+        background-color: #e1e2f5;
+        padding: 10px;
+        position: fixed;
+        overflow: hidden;
+        box-shadow: 2px 2px 2px #b0b7ce;
+      }
+      .canvasDomainTooltipHidden {
+        display: none;
+      }
+      .color-palette {
+        margin-left: 30px; 
+        border: 1px solid grey;
+        width: 16px;
+        height: 16px;
+      }
+
+      .domainTable-td-colorbox{
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        display: flex !important;
+        flex-direction: row;
+      }
+      .domainTable-td{
+        align-items: center;
+        /* display: flex;
+        justify-content: center; */
+      }
+
+      .flex-it {
+        display: flex !important;
+        flex-direction: row;
+        align-items: center;
+      }
+      .outer-container {
+        margin-right: 15px;
+        margin-left:15px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        /*border: 1px solid red;*/
+      }
+
+      .flex-row {
+          display: flex;
+          flex-direction: row;
+          /*border: 1px solid green;*/
+      }
+
+      .rna-td-col2 {
+        text-align: left !important;
+        padding: 1px 3px 1px 3px;
+        word-break: break-all
+        
+
+      }
+      .rna-td-col1 {
+        text-align: left !important;
+        padding: 1px 3px 1px 3px;
+        width: 50px;
+      }
+
+      .rna-table {
+        width: 700px;
+        border: 0px;
+      }

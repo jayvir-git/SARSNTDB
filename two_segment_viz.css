@@ -1,0 +1,332 @@
+/* Two-segment structure viewer — aligns with existing 900px genome scale (29903 nt). */
+
+#tsg-viz-wrap {
+  margin-top: 1.5em;
+}
+
+#tsg-viz-wrap h4.search-header {
+  padding-left: 0;
+}
+
+.tsg-scheme-picker {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #f7fafc;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+}
+
+.tsg-scheme-picker .checkbox-inline {
+  margin: 0 12px 6px 0;
+}
+
+.tsg-coords-row {
+  width: 900px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #333;
+}
+
+.tsg-structure-block {
+  margin-bottom: 1.25em;
+  padding-bottom: 0.75em;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.tsg-structure-block:last-of-type {
+  border-bottom: none;
+}
+
+.tsg-row-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tsg-row-meta {
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.tsg-track {
+  width: 900px;
+  height: 30px;
+  position: relative;
+  background: #edf2f7;
+  border: 1px solid #cbd5e0;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.tsg-seg {
+  position: absolute;
+  height: 14px;
+  top: 8px;
+  background: #2b6cb0;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.tsg-gap {
+  position: absolute;
+  height: 5px;
+  top: 12px;
+  background: #e2e8f0;
+  border-top: 1px solid #718096;
+  border-bottom: 1px solid #718096;
+  box-sizing: border-box;
+  min-width: 1px;
+}
+
+.tsg-primer-section {
+  width: 900px;
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid #cbd5e0;
+}
+
+.tsg-breakpoint-section-title {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tsg-breakpoint-panel {
+  width: 900px;
+  margin-bottom: 16px;
+  padding: 10px 0;
+  background: #f8fafc;
+  border-top: 2px solid #718096;
+  border-bottom: 1px solid #cbd5e0;
+}
+
+.tsg-breakpoint-title {
+  margin: 0 8px 8px;
+  font-size: 12px;
+  color: #344054;
+}
+
+.tsg-breakpoint-axis {
+  position: relative;
+  width: 900px;
+  height: 20px;
+  color: #475467;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+
+.tsg-axis-start,
+.tsg-axis-end,
+.tsg-axis-breakpoint {
+  position: absolute;
+  bottom: 2px;
+}
+
+.tsg-axis-start {
+  left: 0;
+}
+
+.tsg-axis-end {
+  right: 0;
+}
+
+.tsg-axis-breakpoint {
+  transform: translateX(-50%);
+  font-weight: 700;
+  color: #1d2939;
+}
+
+.tsg-primer-row {
+  margin: 7px 0 0;
+}
+
+.tsg-primer-row-label {
+  margin-bottom: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tsg-scheme-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.tsg-primer-track {
+  position: relative;
+  width: 900px;
+  min-height: 28px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #d7dee7;
+  box-sizing: border-box;
+}
+
+.tsg-pair-track {
+  min-height: 12px;
+  margin-top: 2px;
+}
+
+.tsg-pair-label {
+  position: absolute;
+  left: 3px;
+  top: 0;
+  z-index: 3;
+  font-size: 9px;
+  line-height: 12px;
+  color: #667085;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+.tsg-primer-track::before {
+  content: none;
+}
+
+.tsg-primer-border-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #718096;
+  z-index: 1;
+}
+
+.tsg-pair-connector {
+  position: absolute;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--primer-color, #555) 38%, #fff);
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  transform: translateY(-50%);
+}
+
+.tsg-primer-arrow {
+  --primer-color: #555;
+  position: absolute;
+  display: block;
+  height: 10px;
+  min-width: 0;
+  background: transparent;
+  box-sizing: border-box;
+  cursor: help;
+  z-index: 2;
+}
+
+.tsg-primer-arrow::before {
+  content: '';
+  position: absolute;
+  top: 3.5px;
+  height: 3px;
+  background: var(--primer-color);
+}
+
+.tsg-primer-arrow-right::before {
+  left: 0;
+  right: 6px;
+}
+
+.tsg-primer-arrow-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--primer-color);
+}
+
+.tsg-primer-arrow-left::before {
+  left: 6px;
+  right: 0;
+}
+
+.tsg-primer-arrow-left::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 7px solid var(--primer-color);
+}
+
+.tsg-layout-compact .tsg-pair-label {
+  display: none;
+}
+
+.tsg-layout-compact .tsg-pair-track {
+  margin-top: 0;
+}
+
+.tsg-view-toggle {
+  display: inline-block;
+  margin-left: 16px;
+}
+
+.tsg-view-toggle label {
+  font-weight: normal;
+  margin-right: 10px;
+}
+
+.tsg-primer-empty,
+.tsg-primer-none {
+  width: 900px;
+  padding: 5px 8px;
+  color: #667085;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e0;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.tsg-primer-direction-note {
+  margin-top: 7px;
+  color: #555;
+  font-size: 11px;
+}
+
+.tsg-genome-wrap {
+  margin-top: 1.5em;
+  padding-top: 1em;
+  border-top: 2px solid #333;
+}
+
+.tsg-genome-wrap .tsg-row-title {
+  margin-bottom: 8px;
+}
+
+.tsg-genome-bar {
+  width: 900px;
+  height: 50px;
+  position: relative;
+  background: rgb(186, 186, 186);
+  border: 1px solid #999;
+  box-sizing: border-box;
+}
+
+.tsg-gene-block {
+  position: absolute;
+  height: 100%;
+  top: 0;
+  box-sizing: border-box;
+}
+
+.tsg-alert {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  max-width: 900px;
+}
