@@ -199,8 +199,9 @@
 
 .tsg-pair-connector {
   position: absolute;
-  height: 0;
-  border-top: 1px solid color-mix(in srgb, var(--primer-color, #555) 38%, #fff);
+  height: 1px;
+  border: 0;
+  background: color-mix(in srgb, var(--primer-color, #555) 38%, #fff);
   z-index: 1;
   pointer-events: none;
   box-sizing: border-box;
@@ -212,53 +213,41 @@
   position: absolute;
   display: block;
   height: 10px;
-  min-width: 0;
-  background: transparent;
+  min-width: 7px;
+  background: var(--primer-color);
   box-sizing: border-box;
   cursor: help;
   z-index: 2;
 }
 
-.tsg-primer-arrow::before {
-  content: '';
-  position: absolute;
-  top: 3.5px;
-  height: 3px;
-  background: var(--primer-color);
+/* One shape so the shaft stays centered on the head (no 3.5px subpixel offset). */
+.tsg-primer-arrow::before,
+.tsg-primer-arrow::after {
+  content: none;
 }
 
-.tsg-primer-arrow-right::before {
-  left: 0;
-  right: 6px;
+.tsg-primer-arrow-right {
+  clip-path: polygon(
+    0 30%,
+    calc(100% - 7px) 30%,
+    calc(100% - 7px) 0,
+    100% 50%,
+    calc(100% - 7px) 100%,
+    calc(100% - 7px) 70%,
+    0 70%
+  );
 }
 
-.tsg-primer-arrow-right::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-left: 7px solid var(--primer-color);
-}
-
-.tsg-primer-arrow-left::before {
-  left: 6px;
-  right: 0;
-}
-
-.tsg-primer-arrow-left::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-right: 7px solid var(--primer-color);
+.tsg-primer-arrow-left {
+  clip-path: polygon(
+    7px 0,
+    0 50%,
+    7px 100%,
+    7px 70%,
+    100% 70%,
+    100% 30%,
+    7px 30%
+  );
 }
 
 .tsg-layout-compact .tsg-pair-label {

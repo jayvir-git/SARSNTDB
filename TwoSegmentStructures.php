@@ -74,7 +74,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     <title>Two-segment structures — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260901-thick" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260902-center" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -228,7 +228,7 @@ window.TSG_SELECTED_SCHEMES = <?php echo json_encode($selectedPrimerSchemes, JSO
 window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo json_encode($primerLayout); ?>;
 </script>
-<script src="JS/twoSegmentViz.js?v=20260901-thick"></script>
+<script src="JS/twoSegmentViz.js?v=20260902-center"></script>
 <script>
 (function ($) {
     $(function () {

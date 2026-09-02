@@ -30,10 +30,14 @@ var outside = viz.breakpointPrimerBox({ coord_start: 7000, coord_end: 7030 }, le
 assert.strictEqual(outside, null, 'primer outside the breakpoint window should be excluded');
 
 var css = fs.readFileSync(path.join(__dirname, '..', 'two_segment_viz.css'), 'utf8');
-assert.match(css, /\.tsg-primer-arrow::before[\s\S]*?height:\s*3px;/,
-  'primer shaft should be 3 px thick');
+assert.match(css, /\.tsg-primer-arrow-right[\s\S]*?clip-path:\s*polygon/,
+  'primer arrows should be a single clip-path so the shaft stays centered on the head');
+assert.doesNotMatch(css, /\.tsg-primer-arrow::before[\s\S]*?height:\s*3\.5px/,
+  'primer shafts should not use a subpixel top offset');
 assert.match(css, /\.tsg-pair-connector[\s\S]*?color-mix/,
   'pair connectors should use a paler mix of the primer color');
+assert.match(css, /\.tsg-pair-connector[\s\S]*?height:\s*1px/,
+  'pair connectors should be a 1px bar so translateY(-50%) actually centers them');
 assert.doesNotMatch(css, /\.tsg-primer-arrow[\s\S]*?min-width:\s*16px;/,
   'primer arrows should not retain the misleading 16 px minimum width');
 
