@@ -23,6 +23,9 @@ test_coord_050626.csv
 node_modules/
 scripts/node_modules/
 
+# phpGrid is not open source; keep a local copy only (do not publish)
+phpGrid_Lite/
+
 # OS / editor junk
 ._*
 .DS_Store

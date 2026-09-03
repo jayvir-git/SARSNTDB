@@ -47,7 +47,7 @@
 - **fastas/reference.fasta** – Reference genome sequence; used by GenomeResult.php for **DNA sequence search** (finding where a user-entered sequence appears).
 - **Python scripts** (e.g. fastas/fastasequences.py, getvcfdata.py) – Used for generating or processing FASTA/VCF data; not required for the normal web UI.
 - **CanvasJS** – Chart library (local under canvasjs-non-commercial-3.6.6/). Used for pie charts and mutation charts.
-- **phpGrid_Lite** – Third-party grid library; present in the repo but not central to the main documented flows.
+- **phpGrid_Lite** – Local third-party grid library (not in the public GitHub tree); not used by the main documented flows.
 
 ## Security and configuration
 

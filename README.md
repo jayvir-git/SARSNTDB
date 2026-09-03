@@ -42,4 +42,6 @@ Step-by-step: [docs/01-getting-started/03-installation.md](docs/01-getting-start
 
 ## License
 
-Not set. Ask Dr. Grigoriev before publishing this repository. `canvasjs-non-commercial-3.6.6/` and `phpGrid_Lite/` are third-party; confirm those licenses before a public push. Do not publish `_incoming/` data, meeting transcripts, or `connection.php`.
+Application code: not yet assigned (Grigoriev Lab, Rutgers–Camden).
+
+`canvasjs-non-commercial-3.6.6/` is CanvasJS for non-commercial use (CC BY-NC 3.0); keep the chart credit link. `phpGrid_Lite/` is a local third-party copy and is not in this GitHub tree. Do not publish `_incoming/` data, meeting transcripts, or `connection.php`.

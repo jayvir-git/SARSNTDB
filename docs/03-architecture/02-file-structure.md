@@ -97,7 +97,7 @@ This section lists the important files and directories in SARSNTDB. Omitted: thi
 
 ### phpGrid_Lite/
 
-- Third-party PHP grid component (many files). Used only where the app integrates it; not core to the main genome/mutations/repeats flows.
+- Local third-party PHP grid (not used by the main genome/mutations/repeats pages). Gitignored; not on GitHub.
 
 ### .cursor/rules/
 

@@ -33,6 +33,7 @@ $want = [
     [0, 0, 0],
     [0, 0, 0],
     [0, 0, 0],
+    [0, 0, 0],
 ];
 $out = [];
 $stmt = $con->prepare('SELECT id FROM two_segment_structure WHERE coord_left = ? AND coord_right = ? LIMIT 1');
