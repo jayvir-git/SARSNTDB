@@ -1,6 +1,6 @@
 # Before publishing to GitHub
 
-Do not push until Dr. Grigoriev confirms this should be public (or lab-private) and what the license is.
+The application repo may be public. Keep secrets and vendor-restricted trees off GitHub.
 
 ## Must stay off the remote
 
@@ -8,11 +8,12 @@ Do not push until Dr. Grigoriev confirms this should be public (or lab-private) 
 - `_incoming/` data files (xlsx, csv, bed, pdf, docx)
 - Meeting transcripts and `_incoming` packets
 - `.codex-tools/`, `scripts/node_modules/`
+- `phpGrid_Lite/` (gitignored; phpGrid EULA does not allow distributing the library)
 
 ## Confirm with the lab
 
-- License for this repository
-- Whether `canvasjs-non-commercial-3.6.6/` and `phpGrid_Lite/` may be published
+- License for this repository (still unset)
+- CanvasJS is the non-commercial build; keep the chart credit link
 - Whether root SQL dumps (`SARS.sql`, `gene_1_25.sql`, `cov_comp_25.sql`) are OK to share
 - New vs fork of the older public tree, if any
 
