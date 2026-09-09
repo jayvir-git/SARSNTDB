@@ -1,0 +1,5 @@
+DirectoryIndex index.php index.html
+
+<Files "connection.php">
+  Require all denied
+</Files>

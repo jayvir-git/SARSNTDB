@@ -4,6 +4,11 @@
  * and repeat motif matching for links to TwoSegmentStructures.php.
  */
 
+if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
+    mysqli_report(MYSQLI_REPORT_OFF);
+    $con->set_charset('utf8mb4');
+}
+
 if (!function_exists('tsg_interval_from_genome_params')) {
     /**
      * @param string|int $start
@@ -182,6 +187,27 @@ if (!function_exists('tsg_fetch_primer_schemes')) {
     }
 }
 
+if (!function_exists('tsg_all_scheme_codes')) {
+    /**
+     * Every installed scheme code, in display order.
+     *
+     * @param list<array<string,mixed>> $schemes
+     * @return list<string>
+     */
+    function tsg_all_scheme_codes(array $schemes)
+    {
+        $out = [];
+        foreach ($schemes as $scheme) {
+            $code = trim((string) $scheme['code']);
+            if ($code !== '') {
+                $out[] = $code;
+            }
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('tsg_selected_scheme_codes')) {
     /**
      * Keep only codes installed in the database; order follows the scheme table.
@@ -281,6 +307,34 @@ if (!function_exists('tsg_fetch_primers_near_structures')) {
     }
 }
 
+if (!function_exists('tsg_fetch_all_primers')) {
+    /**
+     * Every primer oligo, grouped later by scheme in the UI.
+     *
+     * @return list<array<string,mixed>>
+     */
+    function tsg_fetch_all_primers(mysqli $con)
+    {
+        $out = [];
+        $sql = 'SELECT p.id, p.coord_start, p.coord_end, p.primer_name, p.pool_name,
+                       p.strand, p.direction, s.code AS scheme_code,
+                       s.label AS scheme_label, s.display_order
+                FROM junction_primer p
+                INNER JOIN junction_primer_scheme s ON s.id = p.scheme_id
+                ORDER BY s.display_order ASC, p.coord_start ASC, p.coord_end ASC, p.id ASC';
+        $res = $con->query($sql);
+        if (!$res) {
+            return $out;
+        }
+        while ($row = $res->fetch_assoc()) {
+            $out[] = $row;
+        }
+        $res->free();
+
+        return $out;
+    }
+}
+
 if (!function_exists('tsg_fetch_primers_near_coord')) {
     /**
      * Primers whose start or end is within $window nt of a genome coordinate (SNV).
@@ -300,5 +354,230 @@ if (!function_exists('tsg_fetch_primers_near_coord')) {
         $primers = isset($pack['by_structure']['snv']) ? $pack['by_structure']['snv'] : [];
 
         return ['primers' => $primers, 'error' => $pack['error']];
+    }
+}
+
+if (!function_exists('tsg_utf8ize')) {
+    /**
+     * Recursively repair strings that are not valid UTF-8 (typical when mysqli
+     * fetched utf8mb4 rows over a latin1 connection).
+     *
+     * @param mixed $mixed
+     * @return mixed
+     */
+    function tsg_utf8ize($mixed)
+    {
+        if (is_array($mixed)) {
+            $out = [];
+            foreach ($mixed as $key => $value) {
+                $out[$key] = tsg_utf8ize($value);
+            }
+
+            return $out;
+        }
+        if (!is_string($mixed) || $mixed === '') {
+            return $mixed;
+        }
+        if (function_exists('mb_check_encoding') && mb_check_encoding($mixed, 'UTF-8')) {
+            return $mixed;
+        }
+        if (function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($mixed, 'UTF-8', 'Windows-1252');
+            if (is_string($converted) && $converted !== '') {
+                return $converted;
+            }
+        }
+        if (function_exists('utf8_encode')) {
+            return utf8_encode($mixed);
+        }
+
+        return $mixed;
+    }
+}
+
+if (!function_exists('tsg_json_for_script')) {
+    /**
+     * json_encode for an inline <script> assignment. Never echoes empty/false
+     * (that produces `window.FOO = ;` and kills the rest of the script).
+     *
+     * @param mixed $value
+     * @return string
+     */
+    function tsg_json_for_script($value)
+    {
+        $flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+        $json = json_encode(tsg_utf8ize($value), $flags);
+        if ($json === false || $json === '') {
+            return '{}';
+        }
+
+        return $json;
+    }
+}
+
+if (!function_exists('tsg_is_illustrative_junction')) {
+    function tsg_is_illustrative_junction($row)
+    {
+        $name = isset($row['name']) ? (string) $row['name'] : '';
+        $notes = isset($row['notes']) ? (string) $row['notes'] : '';
+
+        return (stripos($name, 'illustrative') !== false)
+            || (stripos($notes, 'Jim Kelley CSV') !== false);
+    }
+}
+
+if (!function_exists('tsg_junction_size')) {
+    function tsg_junction_size($row)
+    {
+        $left = isset($row['coord_left']) ? (int) $row['coord_left'] : 0;
+        $right = isset($row['coord_right']) ? (int) $row['coord_right'] : 0;
+        if ($left > 0 && $right >= $left) {
+            return $right - $left + 1;
+        }
+
+        return 0;
+    }
+}
+
+if (!function_exists('tsg_nj_table30_csv_paths')) {
+    /**
+     * @return list<string>
+     */
+    function tsg_nj_table30_csv_paths()
+    {
+        $root = __DIR__;
+
+        return [
+            $root . DIRECTORY_SEPARATOR . 'NJ-table-small.csv',
+            $root . DIRECTORY_SEPARATOR . '_incoming' . DIRECTORY_SEPARATOR . 'jim-kelley' . DIRECTORY_SEPARATOR . 'NJ-table-small.csv',
+        ];
+    }
+}
+
+if (!function_exists('tsg_load_nj_table30_csv')) {
+    /**
+     * @return array{rows: list<array<string,mixed>>, path: string|null, error: string|null}
+     */
+    function tsg_load_nj_table30_csv()
+    {
+        $path = null;
+        foreach (tsg_nj_table30_csv_paths() as $candidate) {
+            if (is_readable($candidate)) {
+                $path = $candidate;
+                break;
+            }
+        }
+        if ($path === null) {
+            return ['rows' => [], 'path' => null, 'error' => 'NJ-table-small.csv was not found.'];
+        }
+        $fh = fopen($path, 'rb');
+        if ($fh === false) {
+            return ['rows' => [], 'path' => $path, 'error' => 'Failed to open NJ-table-small.csv.'];
+        }
+        $header = fgetcsv($fh);
+        $map = [];
+        if (is_array($header)) {
+            foreach ($header as $i => $name) {
+                $map[strtolower(trim((string) $name))] = $i;
+            }
+        }
+        $iSize = isset($map['size']) ? $map['size'] : null;
+        $i1 = isset($map['nj start']) ? $map['nj start'] : (isset($map['coord1']) ? $map['coord1'] : (isset($map['start']) ? $map['start'] : null));
+        $i2 = isset($map['nj end']) ? $map['nj end'] : (isset($map['coord2']) ? $map['coord2'] : (isset($map['end']) ? $map['end'] : null));
+        $ir = isset($map['repeat']) ? $map['repeat'] : null;
+        if ($i1 === null || $i2 === null) {
+            fclose($fh);
+
+            return ['rows' => [], 'path' => $path, 'error' => 'NJ-table-small.csv must have NJ Start and NJ End.'];
+        }
+        $rows = [];
+        while (($line = fgetcsv($fh)) !== false) {
+            $c1 = isset($line[$i1]) ? trim((string) $line[$i1]) : '';
+            $c2 = isset($line[$i2]) ? trim((string) $line[$i2]) : '';
+            if ($c1 === '' || $c2 === '' || !is_numeric($c1) || !is_numeric($c2)) {
+                continue;
+            }
+            $left = min((int) $c1, (int) $c2);
+            $right = max((int) $c1, (int) $c2);
+            $size = ($iSize !== null && isset($line[$iSize]) && is_numeric($line[$iSize]))
+                ? (int) $line[$iSize]
+                : ($right - $left + 1);
+            $rep = ($ir !== null && isset($line[$ir])) ? trim((string) $line[$ir]) : '';
+            $rows[] = [
+                'id' => 0,
+                'subtype' => 'sgmRNA',
+                'junction_kind' => 'NJ',
+                'name' => 'NJ ' . $left . '–' . $right . ' (size ' . $size . ')',
+                'coord_from' => 1,
+                'coord_left' => $left,
+                'coord_right' => $right,
+                'coord_to' => 29903,
+                'repeat_seq' => $rep,
+                'size' => $size,
+            ];
+        }
+        fclose($fh);
+
+        return ['rows' => $rows, 'path' => $path, 'error' => null];
+    }
+}
+
+if (!function_exists('tsg_fetch_nj_table30')) {
+    /**
+     * Jim's NJ-table-small.csv table of 30. CSV is the row list; DB supplies schematic ids.
+     * Illustrative extras are never used.
+     *
+     * @return array{rows: list<array<string,mixed>>, source: string, error: string|null}
+     */
+    function tsg_fetch_nj_table30($con)
+    {
+        $csv = tsg_load_nj_table30_csv();
+        if ($csv['error'] !== null) {
+            return ['rows' => [], 'source' => '', 'error' => $csv['error']];
+        }
+        $byPair = [];
+        if ($con instanceof mysqli && !$con->connect_errno) {
+            $sql = 'SELECT id, subtype, junction_kind, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, notes, display_order
+                    FROM two_segment_structure';
+            $result = $con->query($sql);
+            if (!$result && (int) $con->errno === 1054) {
+                $sql = 'SELECT id, subtype, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, display_order
+                        FROM two_segment_structure';
+                $result = $con->query($sql);
+            }
+            if ($result) {
+                while ($row = $result->fetch_assoc()) {
+                    if (tsg_is_illustrative_junction($row)) {
+                        continue;
+                    }
+                    $key = (int) $row['coord_left'] . ':' . (int) $row['coord_right'];
+                    if (!isset($byPair[$key])) {
+                        $byPair[$key] = $row;
+                    }
+                }
+                $result->free();
+            }
+        }
+        $out = [];
+        foreach ($csv['rows'] as $row) {
+            $key = (int) $row['coord_left'] . ':' . (int) $row['coord_right'];
+            if (isset($byPair[$key])) {
+                $hit = $byPair[$key];
+                $row['id'] = (int) $hit['id'];
+                if (!empty($hit['name'])) {
+                    $row['name'] = $hit['name'];
+                }
+                if (!isset($row['junction_kind']) && isset($hit['junction_kind'])) {
+                    $row['junction_kind'] = $hit['junction_kind'];
+                }
+            }
+            $out[] = $row;
+        }
+        $source = 'NJ-table-small.csv (' . count($out) . ' junctions)';
+
+        return ['rows' => $out, 'source' => $source, 'error' => null];
     }
 }

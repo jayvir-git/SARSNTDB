@@ -20,6 +20,23 @@
   margin: 0 12px 6px 0;
 }
 
+.tsg-primer-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 900px;
+}
+
+.tsg-primer-select-row label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.tsg-primer-select-row select {
+  max-width: 640px;
+}
+
 .tsg-coords-row {
   width: 900px;
   display: flex;

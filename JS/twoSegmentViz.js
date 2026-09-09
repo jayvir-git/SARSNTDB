@@ -621,6 +621,17 @@
     }
     var selected = global.TSG_SELECTED_SCHEMES || [];
     var all = global.TSG_SNV_PRIMERS || [];
+    var primerId = global.TSG_SELECTED_PRIMER_ID ? String(global.TSG_SELECTED_PRIMER_ID) : '';
+    if (primerId) {
+      all = all.filter(function (primer) {
+        return String(primer.id) === primerId;
+      });
+      selected = selected.filter(function (scheme) {
+        return all.some(function (primer) {
+          return String(primer.scheme_code) === String(scheme.code);
+        });
+      });
+    }
     var frag = document.createElement('div');
     frag.className = 'tsg-layout-' + primerLayout();
     var header = document.createElement('h4');

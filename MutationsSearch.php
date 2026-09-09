@@ -175,14 +175,25 @@
 
 <?php
   require_once('./connection.php');
+  require_once __DIR__ . '/two_segment_helpers.php';
   $geneRegionMap = [];
-  $geneResult = $con->query("SELECT Protein, Start, End FROM Gene_1 ORDER BY Start");
+  $geneResult = $con->query("SELECT Protein, Start, End FROM gene_1 ORDER BY Start");
   if ($geneResult) {
     while ($row = $geneResult->fetch_assoc()) {
       $geneRegionMap[$row['Protein']] = [
         'start' => (int)$row['Start'],
         'end' => (int)$row['End'],
       ];
+    }
+  }
+  $primerOptionsByScheme = [];
+  if (isset($con) && $con instanceof mysqli && !$con->connect_errno && tsg_primer_tables_exist($con)) {
+    foreach (tsg_fetch_all_primers($con) as $primer) {
+      $schemeLabel = (string) $primer['scheme_label'];
+      if (!isset($primerOptionsByScheme[$schemeLabel])) {
+        $primerOptionsByScheme[$schemeLabel] = [];
+      }
+      $primerOptionsByScheme[$schemeLabel][] = $primer;
     }
   }
 
@@ -285,6 +296,38 @@
             <button type="button" class="btn btn-success" id="submit_region_btn">Submit</button>
           </div>
           </div>
+          <?php if ($primerOptionsByScheme) : ?>
+          <div class="row mutation-search-row">
+            <div class="col-md-12">
+              <p class="mutation-search-label">Search by primer</p>
+            </div>
+            <div class="col-md-6">
+              <label for="Primer">Primer</label>
+              <select class="form-control" id="Primer">
+                <option value="">Select a primer</option>
+                <?php foreach ($primerOptionsByScheme as $schemeLabel => $primers) : ?>
+                <optgroup label="<?php echo htmlspecialchars($schemeLabel, ENT_QUOTES, 'UTF-8'); ?>">
+                  <?php foreach ($primers as $primer) : ?>
+                  <option value="<?php echo (int) $primer['coord_start'] . ':' . (int) $primer['coord_end']; ?>">
+                    <?php echo htmlspecialchars($primer['primer_name'] . ' (' . (int) $primer['coord_start'] . '–' . (int) $primer['coord_end'] . ')', ENT_QUOTES, 'UTF-8'); ?>
+                  </option>
+                  <?php endforeach; ?>
+                </optgroup>
+                <?php endforeach; ?>
+              </select>
+              <small class="text-muted field-hint">Sets Start/End to that oligo so Detail lists SNVs in the primer</small>
+            </div>
+            <div class="col-md-3">
+              <label for="MinPercentPrimer">Min % Frequency</label>
+              <input id="MinPercentPrimer" type="number" class="form-control" min="0" max="100" step="0.01" placeholder="e.g. 1" title="Detail tab only"/>
+              <small class="text-muted field-hint">Detail tab only</small>
+            </div>
+            <div class="col-md-3 search-field-actions">
+              <button type="button" class="btn btn-secondary" id="clear_primer_btn">Clear</button>
+              <button type="button" class="btn btn-success" id="submit_primer_btn">Submit</button>
+            </div>
+          </div>
+          <?php endif; ?>
         </fieldset>
         <br />
       </div>
@@ -358,7 +401,7 @@
         
       </div>
       <div id="mutationsDetail" class="datacontainer" style="display:none;"> 
-          <i id="detailScopeHint">Detail view of the mutations. Select a region, or set Start/End with Region = All. Set Min % Frequency (e.g. 1). Click a row to open primers ±800 bp around that SNV.</i>
+          <i id="detailScopeHint">Detail view of the mutations. Select a region, a primer, or set Start/End with Region = All. Set Min % Frequency (e.g. 1). Click a row to open primers ±800 bp around that SNV. Pango lineages appear when the designation-marker rule matches.</i>
       </div>
     </div>  
 	</div>
@@ -385,6 +428,14 @@
       document.getElementById("Region").value= "All";
       document.getElementById("MinPercentCoord").value="";
       document.getElementById("MinPercentRegion").value="";
+      var primerReset = document.getElementById("Primer");
+      if (primerReset) {
+        primerReset.value = "";
+      }
+      var minPrimerReset = document.getElementById("MinPercentPrimer");
+      if (minPrimerReset) {
+        minPrimerReset.value = "";
+      }
       activeSearchMode = "coordinates";
       activeMinPercent = "";
     }
@@ -696,6 +747,15 @@
         var clearRegionButton = document.getElementById("clear_region_btn");
         clearRegionButton.addEventListener("click", clearRegionSearch);
 
+        var submitPrimerButton = document.getElementById("submit_primer_btn");
+        if (submitPrimerButton) {
+          submitPrimerButton.addEventListener("click", submitPrimerSearch);
+        }
+        var clearPrimerButton = document.getElementById("clear_primer_btn");
+        if (clearPrimerButton) {
+          clearPrimerButton.addEventListener("click", clearPrimerSearch);
+        }
+
         submitCoordinateSearch();
 
         function clearCoordinateSearch() {
@@ -708,6 +768,39 @@
         function clearRegionSearch() {
           document.getElementById("Region").value = "All";
           document.getElementById("MinPercentRegion").value = "";
+        }
+
+        function clearPrimerSearch() {
+          var primer = document.getElementById("Primer");
+          if (primer) {
+            primer.value = "";
+          }
+          var minPrimer = document.getElementById("MinPercentPrimer");
+          if (minPrimer) {
+            minPrimer.value = "";
+          }
+        }
+
+        function submitPrimerSearch() {
+          var primer = document.getElementById("Primer");
+          if (!primer || !primer.value) {
+            alert("Please select a primer.");
+            return;
+          }
+          var parts = primer.value.split(":");
+          if (parts.length < 2) {
+            alert("Please select a primer.");
+            return;
+          }
+          document.getElementById("Start").value = parts[0];
+          document.getElementById("End").value = parts[1];
+          document.getElementById("Region").value = "All";
+          var minPrimer = document.getElementById("MinPercentPrimer");
+          var minCoord = document.getElementById("MinPercentCoord");
+          if (minPrimer && minCoord) {
+            minCoord.value = minPrimer.value;
+          }
+          submitCoordinateSearch();
         }
 
         function submitCoordinateSearch() {
@@ -748,6 +841,14 @@
           document.getElementById("Region").value= "All";
           document.getElementById("MinPercentCoord").value="";
           document.getElementById("MinPercentRegion").value="";
+          var primerResetInner = document.getElementById("Primer");
+          if (primerResetInner) {
+            primerResetInner.value = "";
+          }
+          var minPrimerResetInner = document.getElementById("MinPercentPrimer");
+          if (minPrimerResetInner) {
+            minPrimerResetInner.value = "";
+          }
           activeSearchMode = "coordinates";
           activeMinPercent = "";
         }

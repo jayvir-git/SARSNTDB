@@ -39,6 +39,7 @@
       
 
     require_once './connection.php';
+    mysqli_report(MYSQLI_REPORT_OFF);
     // $sql = "  SELECT cov_comp.*, s.Sequence FROM domain cov_comp
     //               inner join Sequence s on cov_comp.gene = s.Protein
     //             where 1=1 $q1";

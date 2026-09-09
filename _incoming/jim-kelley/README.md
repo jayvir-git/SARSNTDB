@@ -28,6 +28,12 @@ Importers read this folder by filename. Do not move these until those scripts ar
 | `NJ_894.docx` | (notes for NJ 18324–19217) | same |
 | `histogram_example_input.csv` | not wired to an importer | leftover example |
 
+## Packets (source file lives in `files/`, not flat)
+
+| Packet | Importer | App page |
+|--------|----------|----------|
+| `2026-09-09_pango-snv-lineages/files/pango-designation-markers-v1.9-calc-sort.xlsx` | `scripts/import_pango_snv_markers.py` | `MutationsSearch.php` Detail, `SnvPrimerView.php` |
+
 ## Next email
 
 1. Put new files in this folder.

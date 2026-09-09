@@ -52,7 +52,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
         if (isset($_GET['schemes_submitted'])) {
             $selectedSchemeCodes = tsg_selected_scheme_codes(isset($_GET['schemes']) ? $_GET['schemes'] : [], $primerSchemes);
         } else {
-            $selectedSchemeCodes = tsg_selected_scheme_codes(['artic_v3'], $primerSchemes);
+            $selectedSchemeCodes = tsg_all_scheme_codes($primerSchemes);
         }
         foreach ($primerSchemes as $scheme) {
             if (in_array((string) $scheme['code'], $selectedSchemeCodes, true)) {
@@ -222,11 +222,11 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
 </div>
 
 <script>
-window.TSG_ENTRIES = <?php echo json_encode(empty($byId) ? new stdClass() : $byId, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-window.TSG_PRIMERS = <?php echo json_encode(empty($primersByStructure) ? new stdClass() : $primersByStructure, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-window.TSG_SELECTED_SCHEMES = <?php echo json_encode($selectedPrimerSchemes, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.TSG_ENTRIES = <?php echo tsg_json_for_script(empty($byId) ? new stdClass() : $byId); ?>;
+window.TSG_PRIMERS = <?php echo tsg_json_for_script(empty($primersByStructure) ? new stdClass() : $primersByStructure); ?>;
+window.TSG_SELECTED_SCHEMES = <?php echo tsg_json_for_script($selectedPrimerSchemes); ?>;
 window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
-window.TSG_PRIMER_LAYOUT = <?php echo json_encode($primerLayout); ?>;
+window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
 </script>
 <script src="JS/twoSegmentViz.js?v=20260902-center"></script>
 <script>
