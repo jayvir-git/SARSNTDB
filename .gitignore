@@ -18,6 +18,7 @@ transcripts/
 meeting-transcript-*/
 transcribe_zoom.py
 test_coord_050626.csv
+NJ-table-small.csv
 
 # Dependencies (regenerate with npm install in scripts/)
 node_modules/

@@ -33,13 +33,14 @@
       }
 
 
-      $q1 .= " AND Gene_1.Protein = '" . $tmp_prot . "'";
+      $q1 .= " AND gene_1.Protein = '" . $tmp_prot . "'";
     }
 
     
     // echo $tmp_prot;
     // echo $protein;
     require_once './connection.php';
+    mysqli_report(MYSQLI_REPORT_OFF);
     $sql = "  SELECT
     g.Protein Current_Protein,
     g.Gene,
@@ -49,7 +50,7 @@
     g.Aa_count,
     g.Start,
     g.End,
-    g.Function,
+    g.`Function`,
     g.Function_detail,
     -- g.Non_translated_RNA_sequence,
     g.RNA_Sequence,
@@ -65,8 +66,8 @@
     FROM
         cov_comp d
         
-           LEFT OUTER JOIN Gene_1 g on (g.matchedcols = d.gene AND d.gene = '" . $tmp_prot . "')
-           LEFT OUTER JOIN Protein_Images pi on (pi.Protein = g.protein AND d.gene = '" . $tmp_prot . "') 
+           LEFT OUTER JOIN gene_1 g on (g.matchedcols = d.gene AND d.gene = '" . $tmp_prot . "')
+           LEFT OUTER JOIN protein_images pi on (pi.Protein = g.Protein AND d.gene = '" . $tmp_prot . "') 
            WHERE LENGTH(d.cov2Start) > 0
     ORDER BY g.Protein, d.Feature, d.cov2Start";
 
@@ -74,6 +75,7 @@
 
     if (!$result) {
       echo ("query error");
+      echo ' ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       echo $sql;
       exit();
     }

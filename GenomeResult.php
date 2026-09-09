@@ -148,7 +148,7 @@ session_start();
       }
     }
     /*if($gene != ""){
-      $q1 .= " AND Gene_1.Gene LIKE'%" . $gene . "%'";
+      $q1 .= " AND gene_1.Gene LIKE'%" . $gene . "%'";
     } */
     // echo $protein;
 
@@ -171,7 +171,7 @@ session_start();
       }
       // echo gettype($tmp_prot);
       // print_r($tmp_prot);
-      $q1 .= " AND Gene_1.Protein = '" . $protein . "'";
+      $q1 .= " AND gene_1.Protein = '" . $protein . "'";
       $q2 .= " AND cov_comp.gene = '" . $tmp_prot . "'";
       $protSelected = true;
 
@@ -181,31 +181,31 @@ session_start();
       $stminus = $start-15;
       $stplus = $start +15;
 
-      $q1 .= " AND " . $start . " BETWEEN Gene_1.Start AND Gene_1.End";
+      $q1 .= " AND " . $start . " BETWEEN gene_1.Start AND gene_1.End";
       $q2 .= " AND " . $start . " BETWEEN cov_comp.cov2Start AND cov_comp.cov2End";
       $q3 .= " AND repeatcoord.coord BETWEEN '". $stminus  ."' AND '". $stplus  ."' "; 
-      $q4 .= " AND " . $start . " BETWEEN intraGene.leftStart AND intraGene.leftEnd OR " . $start . " BETWEEN intraGene.rightStart AND intraGene.rightEnd";
+      $q4 .= " AND " . $start . " BETWEEN intragene.leftStart AND intragene.leftEnd OR " . $start . " BETWEEN intragene.rightStart AND intragene.rightEnd";
 
     }
 
     if($start != "" and $end != "") {
-      $q1 .= " AND (Gene_1.Start BETWEEN '" . $start . "' AND '" . $end . "' OR Gene_1.End BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN Gene_1.Start AND Gene_1.End) OR ('" . $end . "' BETWEEN Gene_1.Start AND Gene_1.End)) ";    
+      $q1 .= " AND (gene_1.Start BETWEEN '" . $start . "' AND '" . $end . "' OR gene_1.End BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN gene_1.Start AND gene_1.End) OR ('" . $end . "' BETWEEN gene_1.Start AND gene_1.End)) ";    
       $q2 .= " AND (cov_comp.cov2Start BETWEEN '" . $start . "' AND '" . $end . "' OR cov_comp.cov2End BETWEEN '" . $start . "' AND '" . $end . "') ";
       $q3 .= " AND repeatcoord.coord BETWEEN '". $start  ."' AND '". $end  ."' ";
       // if ((intval($end) - intval($start))<100){
       //   $runRepeat = true;
       // }
 
-      $q4 .=  " AND (intraGene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd) OR ('" . $end . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd)) OR  (intraGene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd) OR ('" . $end . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd))";  
+      $q4 .=  " AND (intragene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $end . "' BETWEEN intragene.leftStart AND intragene.leftEnd)) OR  (intragene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.rightStart AND intragene.rightEnd) OR ('" . $end . "' BETWEEN intragene.rightStart AND intragene.rightEnd))";  
     }
 
     if($start == "" and $end != "") {
       $edminus = $end-15;
       $edplus = $end +15;
-      $q1 .= " AND " . $end . " BETWEEN Gene_1.Start AND Gene_1.End";
+      $q1 .= " AND " . $end . " BETWEEN gene_1.Start AND gene_1.End";
       $q2 .= " AND " . $end . " BETWEEN cov_comp.cov2Start AND cov_comp.cov2End"; 
       $q3 .= " AND repeatcoord.coord BETWEEN '". $edminus  ."' AND '". $edplus  ."' "; 
-      $q4 .= " AND " . $end . " BETWEEN intraGene.leftStart AND intraGene.leftEnd OR " . $end . " BETWEEN intraGene.rightStart AND intraGene.rightEnd";
+      $q4 .= " AND " . $end . " BETWEEN intragene.leftStart AND intragene.leftEnd OR " . $end . " BETWEEN intragene.rightStart AND intragene.rightEnd";
 
     }
 
@@ -221,10 +221,10 @@ session_start();
     }
 
     #Gets Genes
-    $sql = "SELECT Gene, Protein, Accession, Start, End, Function, matchedcols FROM Gene_1 WHERE 1=1 $q1 ORDER BY Gene_1.Start = 0, Gene_1.Start, Gene_1.Protein";
+    $sql = "SELECT Gene, Protein, Accession, Start, End, `Function`, matchedcols FROM gene_1 WHERE 1=1 $q1 ORDER BY gene_1.Start = 0, gene_1.Start, gene_1.Protein";
     $result = $con->query($sql);
     if (!$result) {
-      echo ("query error firtst");
+      echo 'query error first: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       exit();
     }
     $result_rows = $result->fetch_all(MYSQLI_ASSOC);
@@ -242,7 +242,7 @@ session_start();
     $result_rowsDom = $resultDom->fetch_all(MYSQLI_ASSOC);
     $totalDom = $resultDom->num_rows;
 
-    // $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intraGene WHERE 1=1 $q4 ORDER BY intragene.leftStart + 0";
+    // $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intragene WHERE 1=1 $q4 ORDER BY intragene.leftStart + 0";
     // $resultIntragene = $con->query($sqlIntraGene);
     // if (!$resultIntragene) {
     //   echo $sqlIntraGene;
@@ -317,7 +317,7 @@ session_start();
                   $protst = $row['Start'];
                   $proted = $row['End'];
                   $q3 .= " AND repeatcoord.coord BETWEEN '".  $protst  ."' AND '".  $proted ."'";
-                  $q4 .= " AND '".  $protst  ."' BETWEEN intraGene.rightStart AND intraGene.rightEnd OR  '".  $proted  ."' BETWEEN intraGene.rightStart AND intraGene.rightEnd OR '".  $protst  ."' BETWEEN intraGene.leftStart AND intraGene.leftEnd OR  '".  $proted  ."' BETWEEN intraGene.leftStart AND intraGene.leftEnd";
+                  $q4 .= " AND '".  $protst  ."' BETWEEN intragene.rightStart AND intragene.rightEnd OR  '".  $proted  ."' BETWEEN intragene.rightStart AND intragene.rightEnd OR '".  $protst  ."' BETWEEN intragene.leftStart AND intragene.leftEnd OR  '".  $proted  ."' BETWEEN intragene.leftStart AND intragene.leftEnd";
                 }
                 // echo $row["Protein"];
                 $data = '';
@@ -554,7 +554,7 @@ session_start();
             <tbody>
                 <?php
                                     
-                    $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intraGene WHERE 1=1 $q4 ORDER BY intraGene.leftStart + 0";
+                    $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intragene WHERE 1=1 $q4 ORDER BY intragene.leftStart + 0";
                     $resultIntragene = $con->query($sqlIntraGene);
                     if (!$resultIntragene) {
                       echo $sqlIntraGene;

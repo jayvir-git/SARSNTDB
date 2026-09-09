@@ -176,7 +176,7 @@ error_reporting(E_ALL);
     $rStart = $_GET['rStart'];
     $lEnd = $_GET['lEnd'];
     $rEnd = $_GET['rEnd'];
-    $q4 = " AND (intraGene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd) OR ('" . $end . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd)) OR  (intraGene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd) OR ('" . $end . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd))";  
+    $q4 = " AND (intragene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $end . "' BETWEEN intragene.leftStart AND intragene.leftEnd)) OR  (intragene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.rightStart AND intragene.rightEnd) OR ('" . $end . "' BETWEEN intragene.rightStart AND intragene.rightEnd))";  
 
  }else if (isset($_GET['start'])){
     $start = $_GET['start'];
@@ -186,7 +186,7 @@ error_reporting(E_ALL);
     $rEnd = $_GET['rEnd'];
     $stminus = $start-15;
     $stplus = $start+15;
-    $q4 = " AND (intraGene.leftStart BETWEEN '" . $start . "' AND '" . $stminus . "' OR intraGene.leftEnd BETWEEN '" . $start . "' AND '" . $stplus . "') OR ('" . $start . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd) OR ('" . $start . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd) ";  
+    $q4 = " AND (intragene.leftStart BETWEEN '" . $start . "' AND '" . $stminus . "' OR intragene.leftEnd BETWEEN '" . $start . "' AND '" . $stplus . "') OR ('" . $start . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $start . "' BETWEEN intragene.rightStart AND intragene.rightEnd) ";  
 
  }else if(isset($_GET['end'])){
     $end = $_GET['end'];
@@ -196,14 +196,14 @@ error_reporting(E_ALL);
     $rEnd = $_GET['rEnd'];
     $edminus = $end-15;
     $edplus = $end+15;
-    $q4 = " AND (intraGene.leftStart BETWEEN '" . $end . "' AND '" . $edminus . "' OR intraGene.leftEnd BETWEEN '" . $end . "' AND '" . $edplus . "') OR ('" . $end . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd) OR ('" . $end . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd) ";  
+    $q4 = " AND (intragene.leftStart BETWEEN '" . $end . "' AND '" . $edminus . "' OR intragene.leftEnd BETWEEN '" . $end . "' AND '" . $edplus . "') OR ('" . $end . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $end . "' BETWEEN intragene.rightStart AND intragene.rightEnd) ";  
 
  }
      require_once './connection.php';
 
-    // $q4 = " AND (intraGene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd) OR ('" . $end . "' BETWEEN intraGene.leftStart AND intraGene.leftEnd)) OR  (intraGene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intraGene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd) OR ('" . $end . "' BETWEEN intraGene.rightStart AND intraGene.rightEnd))";  
+    // $q4 = " AND (intragene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $end . "' BETWEEN intragene.leftStart AND intragene.leftEnd)) OR  (intragene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.rightStart AND intragene.rightEnd) OR ('" . $end . "' BETWEEN intragene.rightStart AND intragene.rightEnd))";  
 
-    $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intraGene WHERE 1=1 $q4 ORDER BY intraGene.leftStart + 0";
+    $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intragene WHERE 1=1 $q4 ORDER BY intragene.leftStart + 0";
     $resultIntragene = $con->query($sqlIntraGene);
     if (!$resultIntragene) {
         echo $sqlIntraGene;

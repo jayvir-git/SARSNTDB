@@ -5,6 +5,11 @@
  * Reverse: import sql/junction_query_drop.sql
  */
 
+if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
+    mysqli_report(MYSQLI_REPORT_OFF);
+    $con->set_charset('utf8mb4');
+}
+
 if (!function_exists('jq_tables_exist')) {
     function jq_tables_exist(mysqli $con)
     {

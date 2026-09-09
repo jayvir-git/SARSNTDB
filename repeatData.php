@@ -5,6 +5,7 @@
     ini_set('display_errors', 1);
     error_reporting(E_ALL);
 
+    $repeat = "";
     if(isset($_GET['repeat'])){
         $repeat = $_GET['repeat'];
         // echo ($repeat);
@@ -19,6 +20,7 @@
     $substringBoo =false;
 
     require_once './connection.php';
+    mysqli_report(MYSQLI_REPORT_OFF);
     $sql = "  SELECT 
      r.sequence,
      r.coord,
@@ -30,7 +32,7 @@
     $result = $con->query($sql);
     // echo gettype($result);
     // echo($sql);
-    if (mysqli_num_rows($result)==0) {
+    if (!$result || mysqli_num_rows($result)==0) {
       
       // if repeat not in UGene database then look for repeats LIKE it (containging it)
       $q1 = " AND r.sequence LIKE '%".$repeat."%'";
@@ -44,7 +46,7 @@
 
       $result = $con->query($sql);
       $substringBoo =true;
-      if (mysqli_num_rows($result)==0) {
+      if (!$result || mysqli_num_rows($result)==0) {
         $obj-> coordinates= array(0);
         $obj -> sequence = array();
         $obj -> substrings = array();
@@ -67,12 +69,12 @@
      g.End
 
     FROM
-        Gene_1 g  ORDER BY g.Start";
+        gene_1 g  ORDER BY g.Start";
 
     $result_gene = $con->query($sqlgene);
 
     if (!$result_gene) {
-      echo ("query error");
+      echo 'query error: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       echo($sqlgene);
       exit();
     }

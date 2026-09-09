@@ -37,6 +37,11 @@ error_reporting(E_ALL);
       tr.snv-primer-row:hover td {
         outline: 1px solid #5cb85c;
       }
+      .snv-pango-list {
+        font-size: 11px;
+        line-height: 1.35;
+        word-break: break-word;
+      }
     </style>
   </head>
 
@@ -104,15 +109,16 @@ error_reporting(E_ALL);
 
     
     require_once('connection.php');
+    require_once __DIR__ . '/snv_pango_helpers.php';
+    mysqli_report(MYSQLI_REPORT_OFF);
     $sql = "SELECT
                 distinct m.reference, m.alternate,  
                 m.coordinate, g.protein, g.domain, SUM(m.mutcount) no_of_samples, g.protSeq, g.RNA_sequence, g.Start
             FROM mutations m
-                INNER JOIN Gene_1 g ON m.coordinate BETWEEN g.start AND g.end
+                INNER JOIN gene_1 g ON m.coordinate BETWEEN g.Start AND g.End
             WHERE 1=1 $q1
-            GROUP BY m.reference, m.alternate, 
-            
-            m.coordinate, g.protein, g.domain 
+            GROUP BY m.reference, m.alternate,
+            m.coordinate, g.protein, g.domain, g.protSeq, g.RNA_sequence, g.Start 
             ORDER BY m.coordinate";
     $result = $con->query($sql);
     // echo ($sql);
@@ -120,7 +126,7 @@ error_reporting(E_ALL);
     
     if (!$result) {
       echo ($sql);
-      echo ("query error");
+      echo ' query error: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       exit();
     }
     $result_rows = $result->fetch_all(MYSQLI_ASSOC);
@@ -141,7 +147,7 @@ error_reporting(E_ALL);
 
     if ($region != "") {
       $scopeText = "Region: " . htmlspecialchars($region, ENT_QUOTES, 'UTF-8');
-      $coordLookup = $con->query("SELECT Start, End FROM Gene_1 WHERE Protein = '" . $con->real_escape_string($region) . "' LIMIT 1");
+      $coordLookup = $con->query("SELECT Start, End FROM gene_1 WHERE Protein = '" . $con->real_escape_string($region) . "' LIMIT 1");
       if ($coordLookup && $coordRow = $coordLookup->fetch_assoc()) {
         $scopeText .= " (genomic coordinates " . (int)$coordRow['Start'] . "–" . (int)$coordRow['End'] . ")";
       }
@@ -159,6 +165,7 @@ error_reporting(E_ALL);
     }
     $visibleRows = count($filtered_rows);
     $scopeText .= "; showing " . $visibleRows . " mutation" . ($visibleRows === 1 ? "" : "s");
+    $pangoMap = snv_pango_all_map($con);
   
   ?>
   <body>
@@ -182,7 +189,7 @@ error_reporting(E_ALL);
     </script>
     <div style="padding: 8px 0; font-size: 12px;">
       <strong>Search scope:</strong> <?php echo $scopeText; ?>
-      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV.</span>
+      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV. Pango lineages are designation markers (single-base SNV, ratio &lt; 0.2).</span>
     </div>
     <div class="datagrid">
       <table class='sortable' >
@@ -197,7 +204,8 @@ error_reporting(E_ALL);
             <th class="no-sort" width='30%'>Amino Acid Change</th>
             <th width='10%'>No. of Samples</th>
             <th width='10%'>%    Containing Mutation</th>
-            <th width='10%'>SNAP2 Analysis</th>
+            <th class="no-sort" width='16%'>Pango lineages</th>
+            <th width='8%'>SNAP2 Analysis</th>
             
           </tr>
         </thead>
@@ -331,6 +339,9 @@ error_reporting(E_ALL);
                 $data.='<td>'.$change.'</td>';
                 $data.='<td>'.$row['no_of_samples'].'</td>';
                 $data.='<td>'.$percentage.'</td>';
+                $pangoKey = snv_pango_key($row['coordinate'], $row['reference'], $row['alternate']);
+                $pangoNames = isset($pangoMap[$pangoKey]) ? $pangoMap[$pangoKey] : [];
+                $data.='<td>'.snv_pango_html_list($pangoNames).'</td>';
                 $data.= '<td><button onclick="copyFunction(\''.$row['protein'].'\',\''.$row['protSeq'].'\')">SNAP2</button> </td>';
               
                 $data.='</tr>';
@@ -338,7 +349,7 @@ error_reporting(E_ALL);
               }
 
               if ($visibleRows === 0 && $minPercent > 0) {
-                echo "<tr><td colspan='8'>No mutations found at or above " . htmlspecialchars($minPercent, ENT_QUOTES, 'UTF-8') . "% frequency for the selected scope.</td></tr>";
+                echo "<tr><td colspan='9'>No mutations found at or above " . htmlspecialchars($minPercent, ENT_QUOTES, 'UTF-8') . "% frequency for the selected scope.</td></tr>";
               }
           ?>
         </tbody>

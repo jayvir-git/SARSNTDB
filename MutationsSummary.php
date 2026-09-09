@@ -58,7 +58,7 @@ error_reporting(E_ALL);
     }
     if($region != "" and $selection == ""){
       $q1 .= " AND g.Protein = '" . $region . "'";
-      $q3 .= "INNER JOIN Gene_1 g ON m.coordinate BETWEEN g.start AND g.end";
+      $q3 .= "INNER JOIN gene_1 g ON m.coordinate BETWEEN g.Start AND g.End";
       $q4 .= " AND g.Protein = '" . $region . "'";
       $selection = 'region';
     }
@@ -75,6 +75,7 @@ error_reporting(E_ALL);
     }
 
     require_once('./connection.php');
+    mysqli_report(MYSQLI_REPORT_OFF);
     $sql = "SELECT
               reference,
               instrument,
@@ -156,7 +157,7 @@ error_reporting(E_ALL);
 
     $sql2 = "SELECT g.Protein, m.coordinate, g.Start, g.End, SUM(m.mutcount) as frequency
               FROM mutations m
-              left outer join Gene_1 g on m.coordinate between g.Start and g.End
+              left outer join gene_1 g on m.coordinate between g.Start and g.End
              where 1=1 $q1
               group by g.Protein, g.Start, g.End, m.coordinate";
 
@@ -164,9 +165,8 @@ error_reporting(E_ALL);
     // echo ($sql2);
 
     if (!$result2) {
-
       echo ($sql2);
-      echo ("query 2 error");
+      echo ' query 2 error: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       exit();
     }
 
@@ -284,7 +284,7 @@ error_reporting(E_ALL);
     //$pq = substr($pq, 0, -1);
 
     $sql3 = "SELECT $pq FROM shapedata irs 
-                inner join Gene_1 g on irs.Coordinate between g.Start and g.End
+                inner join gene_1 g on irs.Coordinate between g.Start and g.End
               where 1=1 $q4 and irs.shapeval is not null";
               
     // //console.log($sql3) and irs.icshape_score is not null;
@@ -299,7 +299,7 @@ error_reporting(E_ALL);
     $result3_rows = $result3->fetch_all(MYSQLI_ASSOC);
 
     $sql3wt = "SELECT $pqwt FROM shapedata irs 
-                inner join Gene_1 g on irs.Coordinate between g.Start and g.End
+                inner join gene_1 g on irs.Coordinate between g.Start and g.End
               where 1=1 $q4 and irs.shapeval is not null";
 
     // //console.log($sql3) and irs.icshape_score is not null;
@@ -316,7 +316,7 @@ error_reporting(E_ALL);
 
 
     $sql3Delta = "SELECT $pqDelta FROM shapedata irs 
-                inner join Gene_1 g on irs.Coordinate between g.Start and g.End
+                inner join gene_1 g on irs.Coordinate between g.Start and g.End
               where 1=1 $q4 and irs.shapeval is not null";
 
 
@@ -332,7 +332,7 @@ error_reporting(E_ALL);
 
 
     $sql3GSE153984 = "SELECT $pqGSE153984 FROM shapedata irs 
-                inner join Gene_1 g on irs.Coordinate between g.Start and g.End
+                inner join gene_1 g on irs.Coordinate between g.Start and g.End
               where 1=1 $q4 and irs.shapeval is not null";
 
     // //console.log($sql3) and irs.icshape_score is not null;

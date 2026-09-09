@@ -55,6 +55,7 @@ error_reporting(E_ALL);
     }
 
     require_once('./connection.php');
+    mysqli_report(MYSQLI_REPORT_OFF);
     $sql = "SELECT
               reference,
               instrument,

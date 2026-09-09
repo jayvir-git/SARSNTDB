@@ -485,7 +485,14 @@ function jq_viridian_label($name)
     </div>
 </div>
 <script>
-window.JQ_CHARTS = <?php echo json_encode($chartPayload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+window.JQ_CHARTS = <?php
+$jqChartJson = json_encode(
+    $chartPayload,
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0)
+);
+echo ($jqChartJson === false || $jqChartJson === '') ? '{}' : $jqChartJson;
+?>;
 </script>
 <script src="JS/junctionQueryCharts.js"></script>
 <script>
