@@ -37,10 +37,48 @@ error_reporting(E_ALL);
       tr.snv-primer-row:hover td {
         outline: 1px solid #5cb85c;
       }
+      table.sortable {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      table.sortable th,
+      table.sortable td {
+        padding: 6px 8px;
+        vertical-align: top;
+        border-right: 1px solid #bbb;
+      }
+      table.sortable th:last-child,
+      table.sortable td:last-child {
+        border-right: none;
+      }
+      th.snv-pango-col,
+      td.snv-pango-col {
+        min-width: 220px;
+        max-width: 320px;
+        padding-right: 16px;
+        border-right: 3px solid #222;
+      }
+      th.snv-pango-col {
+        white-space: nowrap;
+      }
+      th.snv-snap2-col,
+      td.snv-snap2-col {
+        min-width: 130px;
+        padding-left: 16px;
+        white-space: nowrap;
+        text-align: center;
+        vertical-align: middle;
+        border-left: 3px solid #222;
+      }
       .snv-pango-list {
+        display: block;
         font-size: 11px;
-        line-height: 1.35;
-        word-break: break-word;
+        line-height: 1.45;
+      }
+      .snv-pango-item {
+        display: inline-block;
+        white-space: nowrap;
+        margin: 0 8px 3px 0;
       }
     </style>
   </head>
@@ -66,12 +104,12 @@ error_reporting(E_ALL);
         $end = $_GET['End'];
     }
 
-    $minPercent = 0;
+    $minPercent = 1;
     if(isset($_GET['MinPercent']) && $_GET['MinPercent'] !== '' && is_numeric($_GET['MinPercent'])){
         $minPercent = floatval($_GET['MinPercent']);
-        if($minPercent < 0){
-            $minPercent = 0;
-        }
+    }
+    if($minPercent < 1){
+        $minPercent = 1;
     }
 
     $q1 = "";
@@ -138,7 +176,7 @@ error_reporting(E_ALL);
     $filtered_rows = [];
     foreach ($result_rows as $row) {
       $rawPercentage = ($row["no_of_samples"] / $totalSamples) * 100;
-      if ($minPercent > 0 && $rawPercentage < $minPercent) {
+      if ($rawPercentage < $minPercent) {
         continue;
       }
       $row['_rawPercentage'] = $rawPercentage;
@@ -201,11 +239,11 @@ error_reporting(E_ALL);
             <!--<th class="header" width='12%'>Instrument</th>-->
             
             <th class="no-sort" width='12%'>Protein</th>
-            <th class="no-sort" width='30%'>Amino Acid Change</th>
+            <th class="no-sort" width='18%'>Amino Acid Change</th>
             <th width='10%'>No. of Samples</th>
-            <th width='10%'>%    Containing Mutation</th>
-            <th class="no-sort" width='16%'>Pango lineages</th>
-            <th width='8%'>SNAP2 Analysis</th>
+            <th width='10%'>% Containing Mutation</th>
+            <th class="no-sort snv-pango-col">Pango lineages</th>
+            <th class="no-sort snv-snap2-col">SNAP2 Analysis</th>
             
           </tr>
         </thead>
@@ -341,8 +379,8 @@ error_reporting(E_ALL);
                 $data.='<td>'.$percentage.'</td>';
                 $pangoKey = snv_pango_key($row['coordinate'], $row['reference'], $row['alternate']);
                 $pangoNames = isset($pangoMap[$pangoKey]) ? $pangoMap[$pangoKey] : [];
-                $data.='<td>'.snv_pango_html_list($pangoNames).'</td>';
-                $data.= '<td><button onclick="copyFunction(\''.$row['protein'].'\',\''.$row['protSeq'].'\')">SNAP2</button> </td>';
+                $data.='<td class="snv-pango-col">'.snv_pango_html_list($pangoNames).'</td>';
+                $data.= '<td class="snv-snap2-col"><button type="button" onclick="copyFunction(\''.$row['protein'].'\',\''.$row['protSeq'].'\')">SNAP2</button></td>';
               
                 $data.='</tr>';
                 echo $data;

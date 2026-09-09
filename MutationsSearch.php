@@ -239,7 +239,7 @@
             </div>
             <div class="col-md-3">
               <label for="MinPercentCoord">Min % Frequency</label>
-              <input id="MinPercentCoord" type="number" class="form-control" min="0" max="100" step="0.01" placeholder="e.g. 1" title="Detail tab only"/>
+              <input id="MinPercentCoord" type="number" class="form-control" min="1" max="100" step="0.01" value="1" title="Detail tab: rows below 1% are hidden"/>
               <small class="text-muted field-hint">Detail tab only</small>
             </div>
             <div class="col-md-3 search-field-actions">
@@ -288,7 +288,7 @@
           </div>
           <div class="col-md-3">
             <label for="MinPercentRegion">Min % Frequency</label>
-            <input id="MinPercentRegion" type="number" class="form-control" min="0" max="100" step="0.01" placeholder="e.g. 1" title="Detail tab only"/>
+            <input id="MinPercentRegion" type="number" class="form-control" min="1" max="100" step="0.01" value="1" title="Detail tab: rows below 1% are hidden"/>
             <small class="text-muted field-hint">Detail tab only</small>
           </div>
           <div class="col-md-3 col-md-offset-3 search-field-actions">
@@ -319,7 +319,7 @@
             </div>
             <div class="col-md-3">
               <label for="MinPercentPrimer">Min % Frequency</label>
-              <input id="MinPercentPrimer" type="number" class="form-control" min="0" max="100" step="0.01" placeholder="e.g. 1" title="Detail tab only"/>
+              <input id="MinPercentPrimer" type="number" class="form-control" min="1" max="100" step="0.01" value="1" title="Detail tab: rows below 1% are hidden"/>
               <small class="text-muted field-hint">Detail tab only</small>
             </div>
             <div class="col-md-3 search-field-actions">
@@ -401,7 +401,7 @@
         
       </div>
       <div id="mutationsDetail" class="datacontainer" style="display:none;"> 
-          <i id="detailScopeHint">Detail view of the mutations. Select a region, a primer, or set Start/End with Region = All. Set Min % Frequency (e.g. 1). Click a row to open primers ±800 bp around that SNV. Pango lineages appear when the designation-marker rule matches.</i>
+          <i id="detailScopeHint">Detail view of the mutations. Select a region, a primer, or set Start/End with Region = All. Rows below 1% frequency are hidden (raise Min % Frequency to filter further). Click a row to open primers ±800 bp around that SNV. Pango lineages appear when the designation-marker rule matches.</i>
       </div>
     </div>  
 	</div>
@@ -410,7 +410,7 @@
 
     var geneRegionMap = <?php echo json_encode($geneRegionMap); ?>;
     var activeSearchMode = "coordinates";
-    var activeMinPercent = "";
+    var activeMinPercent = "1";
 
     function applyRegionCoordinates(region) {
       if (region !== "All" && geneRegionMap[region]) {
@@ -426,18 +426,18 @@
       document.getElementById("Start").value="1";
       document.getElementById("End").value="29903";  
       document.getElementById("Region").value= "All";
-      document.getElementById("MinPercentCoord").value="";
-      document.getElementById("MinPercentRegion").value="";
+      document.getElementById("MinPercentCoord").value="1";
+      document.getElementById("MinPercentRegion").value="1";
       var primerReset = document.getElementById("Primer");
       if (primerReset) {
         primerReset.value = "";
       }
       var minPrimerReset = document.getElementById("MinPercentPrimer");
       if (minPrimerReset) {
-        minPrimerReset.value = "";
+        minPrimerReset.value = "1";
       }
       activeSearchMode = "coordinates";
-      activeMinPercent = "";
+      activeMinPercent = "1";
     }
     window.onload = function() { 
 
@@ -761,13 +761,13 @@
         function clearCoordinateSearch() {
           document.getElementById("Start").value = "1";
           document.getElementById("End").value = "29903";
-          document.getElementById("MinPercentCoord").value = "";
+          document.getElementById("MinPercentCoord").value = "1";
           submitCoordinateSearch();
         }
 
         function clearRegionSearch() {
           document.getElementById("Region").value = "All";
-          document.getElementById("MinPercentRegion").value = "";
+          document.getElementById("MinPercentRegion").value = "1";
         }
 
         function clearPrimerSearch() {
@@ -777,7 +777,7 @@
           }
           var minPrimer = document.getElementById("MinPercentPrimer");
           if (minPrimer) {
-            minPrimer.value = "";
+            minPrimer.value = "1";
           }
         }
 
@@ -839,18 +839,18 @@
           document.getElementById("Start").value="1";
           document.getElementById("End").value="29903";  
           document.getElementById("Region").value= "All";
-          document.getElementById("MinPercentCoord").value="";
-          document.getElementById("MinPercentRegion").value="";
+          document.getElementById("MinPercentCoord").value="1";
+          document.getElementById("MinPercentRegion").value="1";
           var primerResetInner = document.getElementById("Primer");
           if (primerResetInner) {
             primerResetInner.value = "";
           }
           var minPrimerResetInner = document.getElementById("MinPercentPrimer");
           if (minPrimerResetInner) {
-            minPrimerResetInner.value = "";
+            minPrimerResetInner.value = "1";
           }
           activeSearchMode = "coordinates";
-          activeMinPercent = "";
+          activeMinPercent = "1";
         }
 
         function getData(start,end,region,minPercent){

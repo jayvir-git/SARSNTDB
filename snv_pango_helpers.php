@@ -142,7 +142,7 @@ if (!function_exists('snv_pango_html_list')) {
         }
         $bits = [];
         foreach ($lineages as $name) {
-            $bits[] = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+            $bits[] = '<span class="snv-pango-item">' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '</span>';
         }
 
         return '<span class="snv-pango-list">' . implode(', ', $bits) . '</span>';
