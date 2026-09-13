@@ -64,4 +64,20 @@ assert.notStrictEqual(laneOf('nCoV_14_LEFT'), laneOf('nCoV_15_LEFT'),
 assert.strictEqual(laneOf('nCoV_20_LEFT'), laneOf('nCoV_14_LEFT'),
   'a pair that does not overlap should move back up to the top stripe');
 
+assert.match(css, /\.tsg-nearby-snv-guide[\s\S]*?border-left:\s*1px dotted/,
+  'nearby SNVs should be a pale dotted guide');
+assert.match(css, /\.tsg-nearby-snv-label[\s\S]*?color:\s*#c0c0c0/,
+  'nearby SNV labels should be light gray');
+
+assert.strictEqual(typeof viz.nearbySnvsForWindow, 'function', 'nearbySnvsForWindow should be exported');
+global.window.TSG_NEARBY_SNVS = [
+  { coordinate: 23202, reference: 'C', alternate: 'A', label: 'C23202A' },
+  { coordinate: 21000, reference: 'G', alternate: 'T', label: 'G21000T' }
+];
+global.window.TSG_SHOW_NEARBY_SNVS = true;
+var rightHits = viz.nearbySnvsForWindow(rightWindow);
+assert.strictEqual(rightHits.length, 1, 'only SNVs inside the right 17943 window should be kept');
+assert.strictEqual(rightHits[0].label, 'C23202A', 'C23202A is 11 nt from right breakpoint 23191');
+assert.ok(viz.nearbySnvsEnabled(), 'Show nearby SNVs defaults to on');
+
 console.log('twoSegmentViz breakpoint scale assertions passed');

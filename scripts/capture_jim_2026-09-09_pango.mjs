@@ -43,13 +43,6 @@ const shots = [
     fullPage: true,
   },
   {
-    file: '02_mutations_search_primer_dropdown.png',
-    url: `${BASE}/MutationsSearch.php`,
-    wait: '#Primer',
-    fullPage: false,
-    clipForm: true,
-  },
-  {
     file: '03_snv_G21987A_lineages_all_primers.png',
     url: `${BASE}/SnvPrimerView.php?${schemeParams().toString()}`,
     wait: '.tsg-breakpoint-panel',

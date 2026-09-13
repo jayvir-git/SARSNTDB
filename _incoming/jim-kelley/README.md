@@ -33,6 +33,7 @@ Importers read this folder by filename. Do not move these until those scripts ar
 | Packet | Importer | App page |
 |--------|----------|----------|
 | `2026-09-09_pango-snv-lineages/files/pango-designation-markers-v1.9-calc-sort.xlsx` | `scripts/import_pango_snv_markers.py` | `MutationsSearch.php` Detail, `SnvPrimerView.php` |
+| `2026-09-11_nearby-snvs-indels/` (no new spreadsheet; reuses the v1.9 xlsx) | same importer also writes `sql/pango_indel_marker.sql` | `MutationsDetail.php` indel table; nearby SNVs on `SnvPrimerView.php` and `TwoSegmentStructures.php` |
 
 ## Next email
 

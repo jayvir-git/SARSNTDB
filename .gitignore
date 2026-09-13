@@ -23,6 +23,9 @@ NJ-table-small.csv
 # Dependencies (regenerate with npm install in scripts/)
 node_modules/
 scripts/node_modules/
+scripts/__pycache__/
+__pycache__/
+*.pyc
 
 # phpGrid is not open source; keep a local copy only (do not publish)
 phpGrid_Lite/

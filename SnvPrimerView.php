@@ -1,7 +1,7 @@
 <?php
 /**
- * Primers within ±800 nt of an SNV coordinate (Jim Kelley, 2026-08-31).
- * Pango lineages: designation markers v1.9 (Jim Kelley, 2026-09-09).
+ * Primers within ±800 nt of an SNV or indel coordinate (Jim Kelley, 2026-08-31).
+ * Pango lineages / nearby SNVs: designation markers v1.9 (Jim Kelley, 2026-09-09 / 2026-09-11).
  */
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/two_segment_helpers.php';
@@ -14,6 +14,8 @@ if (isset($_GET['coord']) && is_numeric($_GET['coord'])) {
 $refBase = isset($_GET['ref']) ? trim((string) $_GET['ref']) : '';
 $altBase = isset($_GET['alt']) ? trim((string) $_GET['alt']) : '';
 $protein = isset($_GET['protein']) ? trim((string) $_GET['protein']) : '';
+$variantKind = (isset($_GET['kind']) && $_GET['kind'] === 'indel') ? 'indel' : 'snv';
+$showNearbySnvs = !(isset($_GET['nearby']) && (string) $_GET['nearby'] === '0');
 $selectedPrimerId = '';
 if (isset($_GET['primer']) && ctype_digit((string) $_GET['primer'])) {
     $selectedPrimerId = (string) $_GET['primer'];
@@ -27,13 +29,21 @@ $selectedSchemeCodes = [];
 $snvPrimers = [];
 $pangoLineages = [];
 $pangoGroups = [];
+$overlaySnvs = [];
 $dbError = null;
 $primerDbError = null;
 
 if ($coord < 1 || $coord > 29903) {
     $dbError = 'Pass a genome coordinate in ?coord= (1–29903). Example: SnvPrimerView.php?coord=23202';
 } elseif (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
-    if ($refBase !== '' && $altBase !== '') {
+    $overlaySnvs = snv_overlay_variants($con, 1.0);
+    if ($variantKind === 'indel') {
+        if ($refBase !== '' && $altBase !== '') {
+            $pangoLineages = pango_indel_lineages_for($con, $coord, $refBase, $altBase);
+        } else {
+            $pangoGroups = pango_indel_groups_at_coord($con, $coord);
+        }
+    } elseif ($refBase !== '' && $altBase !== '') {
         $pangoLineages = snv_pango_lineages_for($con, $coord, $refBase, $altBase);
     } else {
         $pangoGroups = snv_pango_groups_at_coord($con, $coord);
@@ -62,8 +72,11 @@ if ($coord < 1 || $coord > 29903) {
 
 $snvLabel = ($refBase !== '' && $altBase !== '')
     ? snv_pango_format_label($coord, $refBase, $altBase)
-    : ('SNV ' . $coord);
+    : (($variantKind === 'indel' ? 'Indel ' : 'SNV ') . $coord);
 $titleBits = [$snvLabel];
+if ($variantKind === 'indel') {
+    array_unshift($titleBits, 'Indel');
+}
 if ($protein !== '') {
     $titleBits[] = $protein;
 }
@@ -85,10 +98,14 @@ foreach ($snvPrimers as $primer) {
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?> — primers — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260909-pango" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260911-nearby2" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
+    <style>
+        .snv-pango-list { font-size: 13px; line-height: 1.45; }
+        .snv-pango-item { white-space: nowrap; }
+    </style>
 </head>
 <body class="tsg-page">
 <div class="panel panel-default" style="margin: 15px;">
@@ -98,8 +115,9 @@ foreach ($snvPrimers as $primer) {
     <div class="panel-body">
         <p style="font-size:13px; max-width:900px;">
             Primers whose start or end is within <strong>&plusmn;<?php echo (int) $primerWindow; ?> nt</strong>
-            of this SNV (same window idea as junction primer arrows).
-            Use the primer list to show one oligo at a time.
+            of this <?php echo $variantKind === 'indel' ? 'indel' : 'SNV'; ?>
+            (same window idea as junction primer arrows).
+            Pale dotted lines are other SNVs in the window at or above the 1% sample cutoff.
             <a href="MutationsSearch.php">Back to Mutations search</a>.
         </p>
         <?php if ($pangoLineages) : ?>
@@ -114,6 +132,9 @@ foreach ($snvPrimers as $primer) {
                     <?php foreach ($pangoGroups as $group) : ?>
                     <li>
                         <strong><?php echo htmlspecialchars($group['label'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if (!empty($group['kind'])) : ?>
+                            (<?php echo htmlspecialchars($group['kind'], ENT_QUOTES, 'UTF-8'); ?>)
+                        <?php endif; ?>
                         — <?php echo snv_pango_html_list($group['lineages']); ?>
                     </li>
                     <?php endforeach; ?>
@@ -121,7 +142,9 @@ foreach ($snvPrimers as $primer) {
             </div>
         <?php elseif ($coord >= 1 && $refBase !== '' && $altBase !== '') : ?>
             <p class="text-muted" style="font-size:13px; max-width:900px;">
-                No pango designation-marker lineages for this SNV (needs a single-base change with ratio &lt; 0.2).
+                No pango designation-marker lineages for this
+                <?php echo $variantKind === 'indel' ? 'indel' : 'SNV'; ?>
+                (needs ratio &lt; 0.2<?php echo $variantKind === 'indel' ? '' : ' and a single-base change'; ?>).
             </p>
         <?php endif; ?>
 
@@ -148,6 +171,9 @@ foreach ($snvPrimers as $primer) {
             <?php if ($protein !== '') : ?>
                 <input type="hidden" name="protein" value="<?php echo htmlspecialchars($protein, ENT_QUOTES, 'UTF-8'); ?>" />
             <?php endif; ?>
+            <?php if ($variantKind === 'indel') : ?>
+                <input type="hidden" name="kind" value="indel" />
+            <?php endif; ?>
             <?php if ($selectedPrimerId !== '') : ?>
                 <input type="hidden" name="primer" id="tsgPrimerHidden" value="<?php echo htmlspecialchars($selectedPrimerId, ENT_QUOTES, 'UTF-8'); ?>" />
             <?php else : ?>
@@ -163,10 +189,17 @@ foreach ($snvPrimers as $primer) {
             <?php endforeach; ?>
             <button type="submit" class="btn btn-default btn-sm">Apply</button>
             <input type="hidden" name="layout" id="tsgLayoutHidden" value="<?php echo htmlspecialchars($primerLayout, ENT_QUOTES, 'UTF-8'); ?>" />
+            <input type="hidden" name="nearby" id="tsgNearbyHidden" value="<?php echo $showNearbySnvs ? '1' : '0'; ?>" />
             <span class="tsg-view-toggle">
                 <strong>View:</strong>
                 <label class="checkbox-inline"><input type="checkbox" id="tsgLayoutDetailed" /> Detailed</label>
                 <label class="checkbox-inline"><input type="checkbox" id="tsgLayoutCompact" /> Compact</label>
+            </span>
+            <span class="tsg-nearby-toggle">
+                <label class="checkbox-inline">
+                    <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
+                    Show nearby SNVs
+                </label>
             </span>
             <?php if ($primersByScheme) : ?>
             <div class="tsg-primer-select-row">
@@ -196,13 +229,18 @@ foreach ($snvPrimers as $primer) {
 
 <script>
 window.TSG_SNV_COORD = <?php echo (int) $coord; ?>;
+window.TSG_VARIANT_KIND = <?php echo tsg_json_for_script($variantKind); ?>;
+window.TSG_SNV_REF = <?php echo tsg_json_for_script($refBase); ?>;
+window.TSG_SNV_ALT = <?php echo tsg_json_for_script($altBase); ?>;
 window.TSG_SNV_PRIMERS = <?php echo tsg_json_for_script($snvPrimers); ?>;
 window.TSG_SELECTED_SCHEMES = <?php echo tsg_json_for_script($selectedPrimerSchemes); ?>;
 window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
 window.TSG_SELECTED_PRIMER_ID = <?php echo tsg_json_for_script($selectedPrimerId); ?>;
+window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
+window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
-<script src="JS/twoSegmentViz.js?v=20260909-pango"></script>
+<script src="JS/twoSegmentViz.js?v=20260911-nearby2"></script>
 <script>
 (function () {
     var sel = document.getElementById('tsgPrimerSelect');

@@ -22,6 +22,10 @@ error_reporting(E_ALL);
           height: 500px;
           overflow: auto;
       }
+      .datagrid-indel {
+          height: auto;
+          max-height: 360px;
+      }
       tr.dark th{
         background: #333;
         color: white;
@@ -76,9 +80,13 @@ error_reporting(E_ALL);
         line-height: 1.45;
       }
       .snv-pango-item {
-        display: inline-block;
         white-space: nowrap;
-        margin: 0 8px 3px 0;
+        margin: 0 0 3px 0;
+      }
+      .indel-heading {
+        margin: 18px 0 6px;
+        font-size: 14px;
+        font-weight: 700;
       }
     </style>
   </head>
@@ -183,18 +191,26 @@ error_reporting(E_ALL);
       $filtered_rows[] = $row;
     }
 
+    $indelStart = 1;
+    $indelEnd = 29903;
     if ($region != "") {
       $scopeText = "Region: " . htmlspecialchars($region, ENT_QUOTES, 'UTF-8');
       $coordLookup = $con->query("SELECT Start, End FROM gene_1 WHERE Protein = '" . $con->real_escape_string($region) . "' LIMIT 1");
       if ($coordLookup && $coordRow = $coordLookup->fetch_assoc()) {
-        $scopeText .= " (genomic coordinates " . (int)$coordRow['Start'] . "–" . (int)$coordRow['End'] . ")";
+        $indelStart = (int)$coordRow['Start'];
+        $indelEnd = (int)$coordRow['End'];
+        $scopeText .= " (genomic coordinates " . $indelStart . "–" . $indelEnd . ")";
       }
     } elseif ($start != "" && $end != "") {
-      $scopeText = "Genomic coordinates " . (int)$start . "–" . (int)$end;
+      $indelStart = (int)$start;
+      $indelEnd = (int)$end;
+      $scopeText = "Genomic coordinates " . $indelStart . "–" . $indelEnd;
     } elseif ($start != "") {
-      $scopeText = "Genomic coordinates " . (int)$start . " and above";
+      $indelStart = (int)$start;
+      $scopeText = "Genomic coordinates " . $indelStart . " and above";
     } elseif ($end != "") {
-      $scopeText = "Genomic coordinates up to " . (int)$end;
+      $indelEnd = (int)$end;
+      $scopeText = "Genomic coordinates up to " . $indelEnd;
     } else {
       $scopeText = "Full genome (coordinates 1–29903)";
     }
@@ -204,6 +220,7 @@ error_reporting(E_ALL);
     $visibleRows = count($filtered_rows);
     $scopeText .= "; showing " . $visibleRows . " mutation" . ($visibleRows === 1 ? "" : "s");
     $pangoMap = snv_pango_all_map($con);
+    $indelRows = pango_indel_in_range($con, $indelStart, $indelEnd);
   
   ?>
   <body>
@@ -227,7 +244,7 @@ error_reporting(E_ALL);
     </script>
     <div style="padding: 8px 0; font-size: 12px;">
       <strong>Search scope:</strong> <?php echo $scopeText; ?>
-      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV. Pango lineages are designation markers (single-base SNV, ratio &lt; 0.2).</span>
+      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV. Pango lineages are designation markers (single-base SNV, ratio &lt; 0.2). Indels from the same workbook are in the table below.</span>
     </div>
     <div class="datagrid">
       <table class='sortable' >
@@ -393,6 +410,56 @@ error_reporting(E_ALL);
         </tbody>
       </table>
     </div>
+    <h4 class="indel-heading">Pango indels</h4>
+    <p class="text-muted" style="font-size:12px; margin:0 0 8px;">
+      Designation-marker indels in this coordinate range (ratio &lt; 0.2).
+      Deletion: longer reference than alternate. Insertion: longer alternate than reference.
+      Click a row for primers ±800 bp around the indel.
+    </p>
+    <div class="datagrid datagrid-indel">
+      <table class="sortable">
+        <thead>
+          <tr class="dark">
+            <th width="12%">Coordinate</th>
+            <th width="12%">Type</th>
+            <th width="18%">Reference</th>
+            <th width="18%">Alternate</th>
+            <th class="no-sort snv-pango-col">Pango lineages</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php
+            if (!$indelRows) {
+              echo '<tr><td colspan="5">No pango designation-marker indels in this coordinate range.</td></tr>';
+            } else {
+              $prev_color = $color1;
+              foreach ($indelRows as $indel) {
+                if ($prev_color === $color1) {
+                  $rowStyle = $color2;
+                  $prev_color = $color2;
+                } else {
+                  $rowStyle = $color1;
+                  $prev_color = $color1;
+                }
+                echo '<tr class="snv-primer-row" style="' . $rowStyle .
+                  '" data-coord="' . htmlspecialchars((string) $indel['coordinate'], ENT_QUOTES, 'UTF-8') .
+                  '" data-ref="' . htmlspecialchars($indel['reference'], ENT_QUOTES, 'UTF-8') .
+                  '" data-alt="' . htmlspecialchars($indel['alternate'], ENT_QUOTES, 'UTF-8') .
+                  '" data-kind="indel" title="Show primers ±800 bp around this indel">';
+                echo '<td>' . (int) $indel['coordinate'] . '</td>';
+                echo '<td>' . htmlspecialchars($indel['kind'], ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td style="font-family:Consolas,monospace;font-size:11px;word-break:break-all;">' .
+                  htmlspecialchars($indel['reference'], ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td style="font-family:Consolas,monospace;font-size:11px;word-break:break-all;">' .
+                  htmlspecialchars($indel['alternate'], ENT_QUOTES, 'UTF-8') . '</td>';
+                echo '<td class="snv-pango-col">' . snv_pango_html_list($indel['lineages']) . '</td>';
+                echo '</tr>';
+              }
+            }
+          ?>
+        </tbody>
+      </table>
+    </div>
   </body>
   <script>
       function copyFunction(prot,seq) {
@@ -418,9 +485,11 @@ error_reporting(E_ALL);
         var ref = row.getAttribute('data-ref');
         var alt = row.getAttribute('data-alt');
         var protein = row.getAttribute('data-protein');
+        var kind = row.getAttribute('data-kind');
         if (ref) { url += '&ref=' + encodeURIComponent(ref); }
         if (alt) { url += '&alt=' + encodeURIComponent(alt); }
         if (protein) { url += '&protein=' + encodeURIComponent(protein); }
+        if (kind) { url += '&kind=' + encodeURIComponent(kind); }
         window.open(url, '_blank');
       });
     </script>
