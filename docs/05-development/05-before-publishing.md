@@ -16,6 +16,7 @@ The application repo may be public. Keep secrets and vendor-restricted trees off
 - CanvasJS is the non-commercial build; keep the chart credit link
 - Whether root SQL dumps (`SARS.sql`, `gene_1_25.sql`, `cov_comp_25.sql`) are OK to share
 - New vs fork of the older public tree, if any
+- The GitHub About **Website** field points at the public lab host. That URL is a demo, not a guarantee it matches `main`. Keep the README table honest if the hosts diverge.
 
 ## Git state to watch
 

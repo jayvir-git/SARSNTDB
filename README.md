@@ -2,10 +2,15 @@
 
 PHP web application for exploring SARS-CoV-2 genomic data: genes, proteins, mutations, repeats, two-segment (sgmRNA) structures, and junction groups.
 
-**Live site:** [grigoriev-lab.camden.rutgers.edu/sarsntdb](https://grigoriev-lab.camden.rutgers.edu/sarsntdb/)  
-**Local:** [http://localhost/SARSNTDB/GenomeSearch.php](http://localhost/SARSNTDB/GenomeSearch.php)
-
 Assigned by Dr. Andrey Grigoriev (Grigoriev Lab, Rutgers–Camden).
+
+**This repository is the current source.** A hosted copy can lag these commits. Clone or run locally if you need the latest pages (Pango lineages, nearby SNVs, indel table, junction/primer UI).
+
+| Copy | Where | What you get |
+|------|--------|----------------|
+| This GitHub tree | the files in this repo | Latest committed code |
+| Local XAMPP | [http://localhost/SARSNTDB/GenomeSearch.php](http://localhost/SARSNTDB/GenomeSearch.php) | Same as this tree after you pull |
+| Lab public site | [grigoriev-lab.camden.rutgers.edu/sarsntdb](https://grigoriev-lab.camden.rutgers.edu/sarsntdb/) | Public demo. It may **not** include recent commits. Do not treat it as a preview of `main`. |
 
 ## Features
 
