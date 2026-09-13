@@ -369,11 +369,103 @@
     return laidOut;
   }
 
+  function nearbySnvsEnabled() {
+    return global.TSG_SHOW_NEARBY_SNVS !== false &&
+      global.TSG_SHOW_NEARBY_SNVS !== 0 &&
+      global.TSG_SHOW_NEARBY_SNVS !== '0';
+  }
+
+  function snvAlleleKey(snv) {
+    return String(Number(snv.coordinate)) + '\t' +
+      String(snv.reference || '').toUpperCase() + '\t' +
+      String(snv.alternate || '').toUpperCase();
+  }
+
+  function nearbySnvsForWindow(windowRange) {
+    var all = global.TSG_NEARBY_SNVS || [];
+    var focalKey = '';
+    if (global.TSG_SNV_COORD && global.TSG_SNV_REF && global.TSG_SNV_ALT) {
+      focalKey = snvAlleleKey({
+        coordinate: global.TSG_SNV_COORD,
+        reference: global.TSG_SNV_REF,
+        alternate: global.TSG_SNV_ALT
+      });
+    }
+    var seen = {};
+    var out = [];
+    all.forEach(function (snv) {
+      var coord = Number(snv.coordinate);
+      if (!isFinite(coord) || coord < windowRange.start || coord > windowRange.end) {
+        return;
+      }
+      var key = snvAlleleKey(snv);
+      if (focalKey && key === focalKey) {
+        return;
+      }
+      if (seen[key]) {
+        return;
+      }
+      seen[key] = true;
+      out.push({
+        coordinate: coord,
+        reference: String(snv.reference || '').toUpperCase(),
+        alternate: String(snv.alternate || '').toUpperCase(),
+        label: snv.label || (String(snv.reference || '') + coord + String(snv.alternate || ''))
+      });
+    });
+    out.sort(function (a, b) {
+      if (a.coordinate !== b.coordinate) {
+        return a.coordinate - b.coordinate;
+      }
+      return a.label.localeCompare(b.label);
+    });
+    return out;
+  }
+
   function renderBorderGuide(track, windowRange) {
     var guide = document.createElement('span');
     guide.className = 'tsg-primer-border-guide';
     guide.style.left = mapBreakpointPos(windowRange.breakpoint, windowRange) + 'px';
     track.appendChild(guide);
+    if (!nearbySnvsEnabled()) {
+      return;
+    }
+    nearbySnvsForWindow(windowRange).forEach(function (snv) {
+      if (snv.coordinate === windowRange.breakpoint) {
+        return;
+      }
+      var nearby = document.createElement('span');
+      nearby.className = 'tsg-nearby-snv-guide';
+      nearby.style.left = mapBreakpointPos(snv.coordinate, windowRange) + 'px';
+      nearby.title = snv.label;
+      track.appendChild(nearby);
+    });
+  }
+
+  function renderNearbySnvLabels(container, windowRange) {
+    if (!nearbySnvsEnabled()) {
+      return;
+    }
+    var snvs = nearbySnvsForWindow(windowRange).filter(function (snv) {
+      return snv.coordinate !== windowRange.breakpoint;
+    });
+    if (!snvs.length) {
+      return;
+    }
+    var row = document.createElement('div');
+    row.className = 'tsg-nearby-snv-labels';
+    var lanes = Math.min(3, snvs.length);
+    row.style.height = (lanes * 12) + 'px';
+    snvs.forEach(function (snv, i) {
+      var lab = document.createElement('span');
+      lab.className = 'tsg-nearby-snv-label';
+      lab.style.left = mapBreakpointPos(snv.coordinate, windowRange) + 'px';
+      lab.style.top = ((i % lanes) * 11) + 'px';
+      lab.textContent = snv.label;
+      lab.title = snv.label;
+      row.appendChild(lab);
+    });
+    container.appendChild(row);
   }
 
   function renderBreakpointAxis(container, windowRange) {
@@ -408,6 +500,11 @@
     row.appendChild(label);
 
     if (!primers.length) {
+      var emptyTrack = document.createElement('div');
+      emptyTrack.className = 'tsg-primer-track tsg-pair-track';
+      emptyTrack.style.height = '14px';
+      renderBorderGuide(emptyTrack, windowRange);
+      row.appendChild(emptyTrack);
       var empty = document.createElement('div');
       empty.className = 'tsg-primer-empty';
       empty.textContent = 'No primers in this breakpoint window.';
@@ -448,13 +545,14 @@
     if (breakpointKind === 'left') {
       kindLabel = 'Left breakpoint';
     } else if (breakpointKind === 'snv') {
-      kindLabel = 'SNV position';
+      kindLabel = global.TSG_VARIANT_KIND === 'indel' ? 'Indel position' : 'SNV position';
     }
     title.innerHTML = '<strong>' + esc(kindLabel) +
       ': ' + esc(breakpoint) + '</strong> &nbsp;|&nbsp; window ' + esc(windowRange.start) +
       '\u2013' + esc(windowRange.end) + ' (\u00b1' + Number(global.TSG_PRIMER_WINDOW || 800) + ' nt)';
     panel.appendChild(title);
     renderBreakpointAxis(panel, windowRange);
+    renderNearbySnvLabels(panel, windowRange);
 
     selected.forEach(function (scheme) {
       var code = String(scheme.code);
@@ -491,7 +589,7 @@
     note.className = 'tsg-primer-direction-note';
     note.textContent = primerLayout() === 'compact'
       ? 'Compact view: pair numbers hidden. Each pair stays on its own stripe; non-overlapping pairs share a row. Pale lines connect LEFT/RIGHT mates; if a mate is offscreen the line runs to the edge of the track.'
-      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint.';
+      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs (\u2265 1% of samples).';
     section.appendChild(note);
     container.appendChild(section);
   }
@@ -636,7 +734,9 @@
     frag.className = 'tsg-layout-' + primerLayout();
     var header = document.createElement('h4');
     header.className = 'search-header';
-    header.textContent = 'Primers near SNV ' + coord + ' (\u00b1800 nt)';
+    header.textContent = 'Primers near ' +
+      (global.TSG_VARIANT_KIND === 'indel' ? 'indel' : 'SNV') +
+      ' ' + coord + ' (\u00b1800 nt)';
     frag.appendChild(header);
     if (!selected.length) {
       var none = document.createElement('div');
@@ -649,7 +749,7 @@
       renderBreakpointPanel(section, { id: 'snv' }, 'snv', coord, all, selected);
       var note = document.createElement('div');
       note.className = 'tsg-primer-direction-note';
-      note.textContent = 'Dashed guide is the SNV. Pale lines connect primer pairs; offscreen mates run to the edge of the track.';
+      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs (\u2265 1% of samples). Pale lines connect primer pairs; offscreen mates run to the edge of the track.';
       section.appendChild(note);
       frag.appendChild(section);
     }
@@ -677,11 +777,39 @@
       window.history.replaceState({}, '', url.toString());
     } catch (ignore) {}
     if (rerender) {
-      if (global.TSG_SNV_COORD) {
-        showSnvWindow();
-      } else if (document.querySelectorAll('input[name="tsg_sel[]"]:checked').length) {
-        showSelected();
+      rerenderPrimerView();
+    }
+  }
+
+  function rerenderPrimerView() {
+    if (global.TSG_SNV_COORD) {
+      showSnvWindow();
+    } else if (document.querySelectorAll('input[name="tsg_sel[]"]:checked').length) {
+      showSelected();
+    }
+  }
+
+  function setNearbySnvs(enabled, rerender) {
+    global.TSG_SHOW_NEARBY_SNVS = !!enabled;
+    var box = document.getElementById('tsgShowNearbySnvs');
+    if (box) {
+      box.checked = nearbySnvsEnabled();
+    }
+    var nearbyHidden = document.getElementById('tsgNearbyHidden');
+    if (nearbyHidden) {
+      nearbyHidden.value = nearbySnvsEnabled() ? '1' : '0';
+    }
+    try {
+      var url = new URL(window.location.href);
+      if (nearbySnvsEnabled()) {
+        url.searchParams.delete('nearby');
+      } else {
+        url.searchParams.set('nearby', '0');
       }
+      window.history.replaceState({}, '', url.toString());
+    } catch (ignore) {}
+    if (rerender) {
+      rerenderPrimerView();
     }
   }
 
@@ -691,6 +819,9 @@
       params = new URLSearchParams(window.location.search);
       if (params.get('layout') === 'compact') {
         global.TSG_PRIMER_LAYOUT = 'compact';
+      }
+      if (params.get('nearby') === '0') {
+        global.TSG_SHOW_NEARBY_SNVS = false;
       }
     } catch (ignore) {}
     var detailed = document.getElementById('tsgLayoutDetailed');
@@ -707,6 +838,13 @@
         setPrimerLayout(this.checked ? 'compact' : 'detailed', true);
       });
     }
+    var nearby = document.getElementById('tsgShowNearbySnvs');
+    if (nearby) {
+      nearby.checked = nearbySnvsEnabled();
+      nearby.addEventListener('change', function () {
+        setNearbySnvs(this.checked, true);
+      });
+    }
   }
 
   if (typeof document !== 'undefined') {
@@ -721,6 +859,9 @@
     showSelected: showSelected,
     showSnvWindow: showSnvWindow,
     setPrimerLayout: setPrimerLayout,
+    setNearbySnvs: setNearbySnvs,
+    nearbySnvsForWindow: nearbySnvsForWindow,
+    nearbySnvsEnabled: nearbySnvsEnabled,
     mapPos: mapPos,
     breakpointWindow: breakpointWindow,
     breakpointPrimerBox: breakpointPrimerBox,

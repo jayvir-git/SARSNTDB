@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/two_segment_helpers.php';
+require_once __DIR__ . '/snv_pango_helpers.php';
 
 $rows = [];
 $dbError = null;
@@ -14,6 +15,8 @@ $selectedPrimerSchemes = [];
 $selectedSchemeCodes = [];
 $primersByStructure = [];
 $primerLayout = (isset($_GET['layout']) && $_GET['layout'] === 'compact') ? 'compact' : 'detailed';
+$showNearbySnvs = !(isset($_GET['nearby']) && (string) $_GET['nearby'] === '0');
+$overlaySnvs = [];
 
 if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $sql = 'SELECT id, subtype, junction_kind, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, link_url, notes, display_order
@@ -65,6 +68,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     } else {
         $primerDbError = 'Primer-arrow tables are not installed. Import sql/primer_arrows.sql.';
     }
+    $overlaySnvs = snv_overlay_variants($con, 1.0);
 }
 ?>
 <!DOCTYPE html>
@@ -74,7 +78,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     <title>Two-segment structures — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260902-center" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260911-nearby2" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -146,10 +150,17 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             <?php endforeach; ?>
             <button type="submit" class="btn btn-default btn-sm">Apply</button>
             <input type="hidden" name="layout" id="tsgLayoutHidden" value="<?php echo htmlspecialchars($primerLayout, ENT_QUOTES, 'UTF-8'); ?>" />
+            <input type="hidden" name="nearby" id="tsgNearbyHidden" value="<?php echo $showNearbySnvs ? '1' : '0'; ?>" />
             <span class="tsg-view-toggle">
                 <strong>View:</strong>
                 <label class="checkbox-inline"><input type="checkbox" id="tsgLayoutDetailed" /> Detailed</label>
                 <label class="checkbox-inline"><input type="checkbox" id="tsgLayoutCompact" /> Compact</label>
+            </span>
+            <span class="tsg-nearby-toggle">
+                <label class="checkbox-inline">
+                    <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
+                    Show nearby SNVs
+                </label>
             </span>
             <span class="help-block" style="margin-bottom:0;">
                 The full-junction track is an overview. Primer arrows appear only in separate left/right
@@ -227,8 +238,10 @@ window.TSG_PRIMERS = <?php echo tsg_json_for_script(empty($primersByStructure) ?
 window.TSG_SELECTED_SCHEMES = <?php echo tsg_json_for_script($selectedPrimerSchemes); ?>;
 window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
+window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
+window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
-<script src="JS/twoSegmentViz.js?v=20260902-center"></script>
+<script src="JS/twoSegmentViz.js?v=20260911-nearby2"></script>
 <script>
 (function ($) {
     $(function () {
