@@ -457,6 +457,164 @@ if (!function_exists('jq_parse_all_list')) {
     }
 }
 
+if (!function_exists('jq_primer_canonical')) {
+    /**
+     * Collapse Excel (V3, V4.1) and Viridian (COVID-ARTIC-V3, V5.0-5.3.2_400) names.
+     */
+    function jq_primer_canonical($name)
+    {
+        $n = strtoupper(trim((string) $name));
+        if ($n === '' || $n === '.') {
+            return $n;
+        }
+        $n = str_replace('_', '-', $n);
+        $n = preg_replace('/^COVID-/', '', $n);
+        $n = preg_replace('/^ARTIC-/', '', $n);
+        $n = preg_replace('/^ARTIC\s+/', '', $n);
+        if ($n === 'V4-1') {
+            return 'V4.1';
+        }
+        return $n;
+    }
+}
+
+if (!function_exists('jq_primer_display_label')) {
+    function jq_primer_display_label($name)
+    {
+        $canon = jq_primer_canonical($name);
+        if ($canon === '' || $canon === '.') {
+            return 'No primer call (.)';
+        }
+        if ($canon === 'V3' || $canon === 'V4.1') {
+            return 'ARTIC ' . $canon;
+        }
+        if (strpos($canon, 'MIDNIGHT') !== false) {
+            return 'Midnight-1200';
+        }
+        if (strpos($canon, 'VARSKIP') !== false) {
+            return 'VarSkip';
+        }
+        return str_replace('-', '_', $canon);
+    }
+}
+
+if (!function_exists('jq_primer_selected')) {
+    /**
+     * @param list<string> $selected
+     */
+    function jq_primer_selected($stored, array $selected)
+    {
+        if (!$selected) {
+            return true;
+        }
+        $key = jq_primer_canonical($stored);
+        foreach ($selected as $item) {
+            if ($key === jq_primer_canonical($item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('jq_merge_primer_options')) {
+    /**
+     * Unique primer values for checkboxes, keyed by canonical name.
+     *
+     * @param list<string> $excelPrimers
+     * @param list<string> $extraPrimers
+     * @return list<string>
+     */
+    function jq_merge_primer_options(array $excelPrimers, array $extraPrimers)
+    {
+        $byCanon = [];
+        foreach (array_merge($excelPrimers, $extraPrimers) as $name) {
+            $canon = jq_primer_canonical($name);
+            if ($canon === '' || $canon === '.') {
+                continue;
+            }
+            if (!isset($byCanon[$canon])) {
+                $byCanon[$canon] = $canon;
+            }
+        }
+        $out = array_values($byCanon);
+        usort($out, 'strcasecmp');
+        return $out;
+    }
+}
+
+if (!function_exists('jq_filter_viridian_pairs')) {
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @param list<string> $selected
+     * @return list<array<string,mixed>>
+     */
+    function jq_filter_viridian_pairs(array $rows, array $selected)
+    {
+        if (!$selected) {
+            return $rows;
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $primer = isset($row['primer_name']) ? $row['primer_name'] : '';
+            if (jq_primer_selected($primer, $selected)) {
+                $out[] = $row;
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('jq_viridian_variants_from_pairs')) {
+    /**
+     * Rebuild variant counts from primer-filtered pair rows, plus a Delta (all) rollup.
+     *
+     * @param list<array<string,mixed>> $pairRows
+     * @return list<array<string,mixed>>
+     */
+    function jq_viridian_variants_from_pairs(array $pairRows)
+    {
+        $agg = [];
+        $delta = [];
+        $proto = [];
+        foreach ($pairRows as $row) {
+            $gid = (string) $row['group_id'];
+            $variant = (string) $row['variant_name'];
+            $count = (int) $row['sample_count'];
+            $key = $gid . "\t" . $variant;
+            if (!isset($agg[$key])) {
+                $agg[$key] = $row;
+                $agg[$key]['sample_count'] = 0;
+                $agg[$key]['is_rollup'] = 0;
+            }
+            $agg[$key]['sample_count'] += $count;
+            if (!isset($proto[$gid])) {
+                $proto[$gid] = $row;
+            }
+            if (stripos($variant, 'Delta') === 0) {
+                if (!isset($delta[$gid])) {
+                    $delta[$gid] = 0;
+                }
+                $delta[$gid] += $count;
+            }
+        }
+        $out = array_values($agg);
+        $rollups = [];
+        foreach ($delta as $gid => $count) {
+            $base = $proto[$gid];
+            $rollups[] = [
+                'group_id' => $base['group_id'],
+                'code' => $base['code'],
+                'group_name' => $base['group_name'],
+                'variant_name' => 'Delta (all)',
+                'sample_count' => $count,
+                'is_rollup' => 1,
+            ];
+        }
+        return array_merge($rollups, $out);
+    }
+}
+
 if (!function_exists('jq_viridian_tables_exist')) {
     function jq_viridian_tables_exist(mysqli $con)
     {
@@ -537,6 +695,31 @@ if (!function_exists('jq_fetch_viridian_pairs')) {
         }
         $res->free();
 
+        return $out;
+    }
+}
+
+if (!function_exists('jq_fetch_viridian_primer_names')) {
+    /**
+     * @return list<string>
+     */
+    function jq_fetch_viridian_primer_names(mysqli $con)
+    {
+        $out = [];
+        if (!jq_viridian_tables_exist($con)) {
+            return $out;
+        }
+        $sql = "SELECT DISTINCT primer_name FROM junction_viridian_pair
+                WHERE primer_name IS NOT NULL AND primer_name <> ''
+                ORDER BY primer_name";
+        $res = $con->query($sql);
+        if (!$res) {
+            return $out;
+        }
+        while ($row = $res->fetch_assoc()) {
+            $out[] = (string) $row['primer_name'];
+        }
+        $res->free();
         return $out;
     }
 }

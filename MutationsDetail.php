@@ -22,10 +22,6 @@ error_reporting(E_ALL);
           height: 500px;
           overflow: auto;
       }
-      .datagrid-indel {
-          height: auto;
-          max-height: 360px;
-      }
       tr.dark th{
         background: #333;
         color: white;
@@ -83,168 +79,31 @@ error_reporting(E_ALL);
         white-space: nowrap;
         margin: 0 0 3px 0;
       }
-      .indel-heading {
-        margin: 18px 0 6px;
-        font-size: 14px;
-        font-weight: 700;
-      }
     </style>
   </head>
 
   <?php
-    $region = $referenceBase = $alternateBase = $instrument = $start = $end = "";
-    if(isset($_GET['Region'])){
-        $region = $_GET['Region'];
-    }
-    if(isset($_GET['ReferenceBase'])){
-        $referenceBase = $_GET['ReferenceBase'];
-    }
-    if(isset($_GET['AlternateBase'])){
-        $alternateBase = $_GET['AlternateBase'];
-    }
-    if(isset($_GET['Instrument'])){
-        $instrument = $_GET['Instrument'];
-    }
-    if(isset($_GET['Start'])){
-        $start = $_GET['Start'];
-    }
-    if(isset($_GET['End'])){
-        $end = $_GET['End'];
-    }
-
-    $minPercent = 1;
-    if(isset($_GET['MinPercent']) && $_GET['MinPercent'] !== '' && is_numeric($_GET['MinPercent'])){
-        $minPercent = floatval($_GET['MinPercent']);
-    }
-    if($minPercent < 1){
-        $minPercent = 1;
-    }
-
-    $q1 = "";
-
-    if($region != ""){
-    $q1 .= " AND g.Protein = '" . $region . "'";
-    }
-
-    if($referenceBase != ""){
-    $q1 .= " AND m.reference = '" . $referenceBase . "'";
-    }
-
-    if($alternateBase != ""){
-    $q1 .= " AND m.alternate = '" . $alternateBase . "'";
-    }
-
-    if($start != "" and $end == "") {
-    $q1 .= " AND m.coordinate >= " . $start;
-    }
-
-    if($start != "" and $end != "") {
-    $q1 .= " AND m.coordinate BETWEEN " . $start . " AND " . $end;
-    }
-
-    if($start == "" and $end != "") {
-    $q1 .= " AND m.coordinate <= " . $end;
-    }
-
-    if($instrument != ""){
-    $q1 .= " AND m.instrument = '" . $instrument . "'";
-    }
-
-
-
-
-    
     require_once('connection.php');
     require_once __DIR__ . '/snv_pango_helpers.php';
+    require_once __DIR__ . '/mutations_detail_helpers.php';
     mysqli_report(MYSQLI_REPORT_OFF);
-    $sql = "SELECT
-                distinct m.reference, m.alternate,  
-                m.coordinate, g.protein, g.domain, SUM(m.mutcount) no_of_samples, g.protSeq, g.RNA_sequence, g.Start
-            FROM mutations m
-                INNER JOIN gene_1 g ON m.coordinate BETWEEN g.Start AND g.End
-            WHERE 1=1 $q1
-            GROUP BY m.reference, m.alternate,
-            m.coordinate, g.protein, g.domain, g.protSeq, g.RNA_sequence, g.Start 
-            ORDER BY m.coordinate";
-    $result = $con->query($sql);
-    // echo ($sql);
-
-    
-    if (!$result) {
-      echo ($sql);
+    $pack = mutations_detail_load($con);
+    if ($pack === null) {
       echo ' query error: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       exit();
     }
-    $result_rows = $result->fetch_all(MYSQLI_ASSOC);
-    $total = $result->num_rows;
-
-    $totalSamples = 18900;
-    $columns = array_column($result_rows, 'coordinate');
-    array_multisort($columns, SORT_ASC, $result_rows);
-    $filtered_rows = [];
-    foreach ($result_rows as $row) {
-      $rawPercentage = ($row["no_of_samples"] / $totalSamples) * 100;
-      if ($rawPercentage < $minPercent) {
-        continue;
-      }
-      $row['_rawPercentage'] = $rawPercentage;
-      $filtered_rows[] = $row;
-    }
-
-    $indelStart = 1;
-    $indelEnd = 29903;
-    if ($region != "") {
-      $scopeText = "Region: " . htmlspecialchars($region, ENT_QUOTES, 'UTF-8');
-      $coordLookup = $con->query("SELECT Start, End FROM gene_1 WHERE Protein = '" . $con->real_escape_string($region) . "' LIMIT 1");
-      if ($coordLookup && $coordRow = $coordLookup->fetch_assoc()) {
-        $indelStart = (int)$coordRow['Start'];
-        $indelEnd = (int)$coordRow['End'];
-        $scopeText .= " (genomic coordinates " . $indelStart . "–" . $indelEnd . ")";
-      }
-    } elseif ($start != "" && $end != "") {
-      $indelStart = (int)$start;
-      $indelEnd = (int)$end;
-      $scopeText = "Genomic coordinates " . $indelStart . "–" . $indelEnd;
-    } elseif ($start != "") {
-      $indelStart = (int)$start;
-      $scopeText = "Genomic coordinates " . $indelStart . " and above";
-    } elseif ($end != "") {
-      $indelEnd = (int)$end;
-      $scopeText = "Genomic coordinates up to " . $indelEnd;
-    } else {
-      $scopeText = "Full genome (coordinates 1–29903)";
-    }
-    if ($minPercent > 0) {
-      $scopeText .= "; minimum frequency ≥ " . htmlspecialchars($minPercent, ENT_QUOTES, 'UTF-8') . "%";
-    }
+    $filtered_rows = $pack['rows'];
+    $minPercent = $pack['min_percent'];
+    $showSnap2 = $pack['show_snap2'];
     $visibleRows = count($filtered_rows);
-    $scopeText .= "; showing " . $visibleRows . " mutation" . ($visibleRows === 1 ? "" : "s");
-    $pangoMap = snv_pango_all_map($con);
-    $indelRows = pango_indel_in_range($con, $indelStart, $indelEnd);
-  
+    $scopeText = htmlspecialchars($pack['scope_text'], ENT_QUOTES, 'UTF-8');
+    $emptyCols = $showSnap2 ? 9 : 8;
+    $pangoRangeUrl = 'PangoMarkers.php?Start=' . (int) $pack['indel_start'] . '&End=' . (int) $pack['indel_end'];
   ?>
   <body>
-    
-    <script>
-
-      function copyFunction(prot,seq) {
-        // Get the text field
-        var copyText = ">"+prot+"\n"+seq;
-
-        // Select the text field
-        copyText.select();
-        copyText.setSelectionRange(0, 99999); // For mobile devices
-
-        // Copy the text inside the text field
-        navigator.clipboard.writeText(copyText.value);
-
-        // Alert the copied text
-        alert("Copied the text: " + copyText.value);
-      }
-    </script>
     <div style="padding: 8px 0; font-size: 12px;">
       <strong>Search scope:</strong> <?php echo $scopeText; ?>
-      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV. Pango lineages are designation markers (single-base SNV, ratio &lt; 0.2). Indels from the same workbook are in the table below.</span>
+      <span class="text-muted"> — Click a row to open primers ±800 bp around that SNV. Pango lineages on a row are published designation markers matching that SNV (single-base, ratio &lt; 0.2); they are not counts from this group. Full SNV and indel marker tables: <a href="<?php echo htmlspecialchars($pangoRangeUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">Pango markers</a> for this coordinate range. Percentages use n=<?php echo (int) $pack['sample_count']; ?> analyzed samples in this group.</span>
     </div>
     <div class="datagrid">
       <table class='sortable' >
@@ -258,9 +117,11 @@ error_reporting(E_ALL);
             <th class="no-sort" width='12%'>Protein</th>
             <th class="no-sort" width='18%'>Amino Acid Change</th>
             <th width='10%'>No. of Samples</th>
-            <th width='10%'>% Containing Mutation</th>
+            <th width='10%' title="Share of <?php echo (int) $pack['sample_count']; ?> samples in <?php echo htmlspecialchars($pack['group_label'], ENT_QUOTES, 'UTF-8'); ?>">% Containing Mutation</th>
             <th class="no-sort snv-pango-col">Pango lineages</th>
-            <th class="no-sort snv-snap2-col">SNAP2 Analysis</th>
+            <?php if ($showSnap2) : ?>
+            <th class="no-sort snv-snap2-col">Copy protein FASTA</th>
+            <?php endif; ?>
             
           </tr>
         </thead>
@@ -271,192 +132,40 @@ error_reporting(E_ALL);
               $color1 = 'background-color:White';
               $color2 = 'background-color:LightGray';
               $prev_color = $color1;
-              $aminoacids=array("F","L","I","M","V","S","P","T","A","Y","*","H","Q","N","K","D","E","C","W","R","G","X");
-
-              $triplets=array("(TTT |TTC )","(TTA |TTG |CT. )","(ATT |ATC |ATA )","(ATG )","(GT. )","(TC. |AGT |AGC )",
-              "(CC. )","(AC. )","(GC. )","(TAT |TAC )","(TAA |TAG |TGA )","(CAT |CAC )",
-              "(CAA |CAG )","(AAT |AAC )","(AAA |AAG )","(GAT |GAC )","(GAA |GAG )","(TGT |TGC )",
-              "(TGG )","(CG. |AGA |AGG )","(GG. )","(\S\S\S )");
-
-              $copyFasta = "";
               foreach($filtered_rows as $row) {
-                $rawPercentage = $row['_rawPercentage'];
-
-                $mutGeneCoord = $row['coordinate']-$row['Start'];
-                $newseq = substr_replace($row['RNA_sequence'], $row['alternate'], $mutGeneCoord,1);
-
-                $temp = chunk_split($newseq,3,' ');
-                $peptide = preg_replace ($triplets, $aminoacids, $temp);
-                $length = strlen($row['protSeq']);
-                
-                // $change="No change";
-
-                if ($peptide == $row['protSeq']){
-                  $change="Synonymous change";
-                }else{
-                  #checks for what kind of variant it is 
-                  for ($index = 0; $index < $length; $index++) {
-           
-                    $newAA = $peptide[$index];                      
-                    $canonAA=$row['protSeq'][$index];
-                    
-                    if ($newAA==$canonAA){
-
-                    }else{
-                      if ($newAA== "*"){
-                        $change="Nonsense Variant";
-                        break;
-                      }else{
-                        $change="Missense Variant: p.";
-                        $change.=$canonAA;
-                        $change.=$index+1;
-                        // $change.="|||||||||||||||||";
-
-                        $change.=$newAA;
-                        // $change.="  |  ";
-
-                        $orf1ansp = ['Nsp1',
-                        'Nsp2',
-                        'Nsp3',
-                        'Nsp4',
-                        'Nsp5',
-                        'Nsp6',
-                        'Nsp7',
-                        'Nsp8',
-                        'Nsp9',
-                        'Nsp10',
-                        'Nsp11',];
-                        $orf1bnsp = ['Nsp12',
-                        'Nsp13',
-                        'Nsp14',
-                        'Nsp15',
-                        'Nsp16'];
-
-
-                        $abbvProts = ["Surface Glycoprotein","Envelope Membrane Protein", "Membrane Protein","Nucleocapsid proteins"];
-
-                        #below is not really used, I disabled the covarniant link as it doesnt work for 99% of mutations
-                        if (in_array($row['protein'],$abbvProts)){
-                          $tmp_prot = substr($row['protein'], 0,1);
-                          $covariantlink=$tmp_prot;
-                          $ind1 = $index+1;
-                          $covariantlink.=".".$canonAA.$ind1;
-                        }else if (in_array($row['protein'],$orf1ansp)){
-                          $covariantlink="";
-                        }else if (in_array($row['protein'],$orf1bnsp)){
-                          $covariantlink="";
-                        }else{
-                          $tmp_prot = $row['protein'];
-                          $covariantlink=$tmp_prot;
-                          
-
-                          $ind1 = $index+1;
-                                                }
-                          
-                        // $covariantlink = "";
-                        // $change.='<a href="https://covariants.org/variants/'.$covariantlink.'">Try your luck on Covariant</a>';
-                        break;
-                      }
-                    }
-  
-                  }
+                $change = $row['_aa_change'];
+                $percentage = $row['_percentage'];
+                $protein = $row['_protein'];
+                $rowStyle = ($prev_color === $color1) ? $color2 : $color1;
+                $prev_color = $rowStyle;
+                $data = "<tr class=\"snv-primer-row\" style=".$rowStyle.
+                  " data-coord=\"".htmlspecialchars((string)$row['coordinate'], ENT_QUOTES, 'UTF-8').
+                  "\" data-ref=\"".htmlspecialchars((string)$row['reference'], ENT_QUOTES, 'UTF-8').
+                  "\" data-alt=\"".htmlspecialchars((string)$row['alternate'], ENT_QUOTES, 'UTF-8').
+                  "\" data-protein=\"".htmlspecialchars((string)$protein, ENT_QUOTES, 'UTF-8').
+                  "\" title=\"Show primers ±800 bp around this SNV\">";
+                $data.='<td>'.htmlspecialchars((string)$row['coordinate'], ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$row['reference'], ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$row['alternate'], ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$protein, ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$change, ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$row['no_of_samples'], ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td>'.htmlspecialchars((string)$percentage, ENT_QUOTES, 'UTF-8').'</td>';
+                $data.='<td class="snv-pango-col">'.snv_pango_html_list($row['_pango']).'</td>';
+                if ($showSnap2) {
+                  $protAttr = htmlspecialchars((string)$protein, ENT_QUOTES, 'UTF-8');
+                  $seqAttr = htmlspecialchars((string)$row['protSeq'], ENT_QUOTES, 'UTF-8');
+                  $data.= '<td class="snv-snap2-col"><button type="button" class="snv-copy-fasta" data-prot="'.$protAttr.'" data-seq="'.$seqAttr.'" title="Copies the canonical protein FASTA. Does not run SNAP2 analysis.">Copy FASTA</button></td>';
                 }
-
-                // for ($index = 0; $index < $length; $index++) {
-                  // $triplet = substr($newseq,$index,$index+3);
-                  // $peptide = preg_replace ($triplets[$genetic_code], $aminoacids, $temp);
-
-                // }
-                $percentage= round($rawPercentage, 2);
-                $data = '';
-                if ($prev_color==$color1){
-                  $data.= "<tr class=\"snv-primer-row\" style=".$color2.
-                    " data-coord=\"".htmlspecialchars((string)$row['coordinate'], ENT_QUOTES, 'UTF-8').
-                    "\" data-ref=\"".htmlspecialchars((string)$row['reference'], ENT_QUOTES, 'UTF-8').
-                    "\" data-alt=\"".htmlspecialchars((string)$row['alternate'], ENT_QUOTES, 'UTF-8').
-                    "\" data-protein=\"".htmlspecialchars((string)$row['protein'], ENT_QUOTES, 'UTF-8').
-                    "\" title=\"Show primers ±800 bp around this SNV\">" ;
-                  $prev_color=$color2;
-                } elseif ($prev_color==$color2){
-                  $data.= "<tr class=\"snv-primer-row\" style=".$color1.
-                    " data-coord=\"".htmlspecialchars((string)$row['coordinate'], ENT_QUOTES, 'UTF-8').
-                    "\" data-ref=\"".htmlspecialchars((string)$row['reference'], ENT_QUOTES, 'UTF-8').
-                    "\" data-alt=\"".htmlspecialchars((string)$row['alternate'], ENT_QUOTES, 'UTF-8').
-                    "\" data-protein=\"".htmlspecialchars((string)$row['protein'], ENT_QUOTES, 'UTF-8').
-                    "\" title=\"Show primers ±800 bp around this SNV\">" ;
-                  $prev_color=$color1;
-                }
-                $data.='<td>'.$row['coordinate'].'</td>';
-                $data.='<td>'.$row['reference'].'</td>';
-                $data.='<td>'.$row['alternate'].'</td>';
-                //$data.='<td>'.$row['instrument'].'</td>';
-                $data.='<td>'.$row['protein'].'</td>';
-                $data.='<td>'.$change.'</td>';
-                $data.='<td>'.$row['no_of_samples'].'</td>';
-                $data.='<td>'.$percentage.'</td>';
-                $pangoKey = snv_pango_key($row['coordinate'], $row['reference'], $row['alternate']);
-                $pangoNames = isset($pangoMap[$pangoKey]) ? $pangoMap[$pangoKey] : [];
-                $data.='<td class="snv-pango-col">'.snv_pango_html_list($pangoNames).'</td>';
-                $data.= '<td class="snv-snap2-col"><button type="button" onclick="copyFunction(\''.$row['protein'].'\',\''.$row['protSeq'].'\')">SNAP2</button></td>';
-              
                 $data.='</tr>';
                 echo $data;
               }
 
               if ($visibleRows === 0 && $minPercent > 0) {
-                echo "<tr><td colspan='9'>No mutations found at or above " . htmlspecialchars($minPercent, ENT_QUOTES, 'UTF-8') . "% frequency for the selected scope.</td></tr>";
+                echo "<tr><td colspan='" . $emptyCols . "'>No mutations found at or above " . htmlspecialchars((string)$minPercent, ENT_QUOTES, 'UTF-8') . "% frequency for the selected scope.</td></tr>";
               }
           ?>
-        </tbody>
-      </table>
-    </div>
-    <h4 class="indel-heading">Pango indels</h4>
-    <p class="text-muted" style="font-size:12px; margin:0 0 8px;">
-      Designation-marker indels in this coordinate range (ratio &lt; 0.2).
-      Deletion: longer reference than alternate. Insertion: longer alternate than reference.
-      Click a row for primers ±800 bp around the indel.
-    </p>
-    <div class="datagrid datagrid-indel">
-      <table class="sortable">
-        <thead>
-          <tr class="dark">
-            <th width="12%">Coordinate</th>
-            <th width="12%">Type</th>
-            <th width="18%">Reference</th>
-            <th width="18%">Alternate</th>
-            <th class="no-sort snv-pango-col">Pango lineages</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php
-            if (!$indelRows) {
-              echo '<tr><td colspan="5">No pango designation-marker indels in this coordinate range.</td></tr>';
-            } else {
-              $prev_color = $color1;
-              foreach ($indelRows as $indel) {
-                if ($prev_color === $color1) {
-                  $rowStyle = $color2;
-                  $prev_color = $color2;
-                } else {
-                  $rowStyle = $color1;
-                  $prev_color = $color1;
-                }
-                echo '<tr class="snv-primer-row" style="' . $rowStyle .
-                  '" data-coord="' . htmlspecialchars((string) $indel['coordinate'], ENT_QUOTES, 'UTF-8') .
-                  '" data-ref="' . htmlspecialchars($indel['reference'], ENT_QUOTES, 'UTF-8') .
-                  '" data-alt="' . htmlspecialchars($indel['alternate'], ENT_QUOTES, 'UTF-8') .
-                  '" data-kind="indel" title="Show primers ±800 bp around this indel">';
-                echo '<td>' . (int) $indel['coordinate'] . '</td>';
-                echo '<td>' . htmlspecialchars($indel['kind'], ENT_QUOTES, 'UTF-8') . '</td>';
-                echo '<td style="font-family:Consolas,monospace;font-size:11px;word-break:break-all;">' .
-                  htmlspecialchars($indel['reference'], ENT_QUOTES, 'UTF-8') . '</td>';
-                echo '<td style="font-family:Consolas,monospace;font-size:11px;word-break:break-all;">' .
-                  htmlspecialchars($indel['alternate'], ENT_QUOTES, 'UTF-8') . '</td>';
-                echo '<td class="snv-pango-col">' . snv_pango_html_list($indel['lineages']) . '</td>';
-                echo '</tr>';
-              }
-            }
-          ?>
+
         </tbody>
       </table>
     </div>
@@ -467,7 +176,7 @@ error_reporting(E_ALL);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(copyText);
         }
-        alert("Copied the text: " + copyText);
+        alert("Copied the canonical protein FASTA for " + prot + ". SNAP2 is not run from this page.");
       }
       document.addEventListener('click', function (e) {
         if (e.target.closest && e.target.closest('button')) {

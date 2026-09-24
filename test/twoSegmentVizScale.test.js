@@ -68,8 +68,11 @@ assert.match(css, /\.tsg-nearby-snv-guide[\s\S]*?border-left:\s*1px dotted/,
   'nearby SNVs should be a pale dotted guide');
 assert.match(css, /\.tsg-nearby-snv-label[\s\S]*?color:\s*#c0c0c0/,
   'nearby SNV labels should be light gray');
+assert.match(css, /\.tsg-pango-marker-guide[\s\S]*?border-left:\s*1px dashed/,
+  'Pango markers should be a dashed guide distinct from Original nearby SNVs');
 
 assert.strictEqual(typeof viz.nearbySnvsForWindow, 'function', 'nearbySnvsForWindow should be exported');
+assert.strictEqual(typeof viz.pangoMarkersForWindow, 'function', 'pangoMarkersForWindow should be exported');
 global.window.TSG_NEARBY_SNVS = [
   { coordinate: 23202, reference: 'C', alternate: 'A', label: 'C23202A' },
   { coordinate: 21000, reference: 'G', alternate: 'T', label: 'G21000T' }
@@ -79,5 +82,16 @@ var rightHits = viz.nearbySnvsForWindow(rightWindow);
 assert.strictEqual(rightHits.length, 1, 'only SNVs inside the right 17943 window should be kept');
 assert.strictEqual(rightHits[0].label, 'C23202A', 'C23202A is 11 nt from right breakpoint 23191');
 assert.ok(viz.nearbySnvsEnabled(), 'Show nearby SNVs defaults to on');
+
+global.window.TSG_PANGO_MARKERS = [
+  { coordinate: 23202, reference: 'C', alternate: 'A', kind: 'snv', label: 'C23202A' },
+  { coordinate: 685, reference: 'AAAGTCATTT', alternate: 'A', kind: 'indel', label: '685 deletion REF=AAAGTCATTT ALT=A' }
+];
+var pangoRight = viz.pangoMarkersForWindow(rightWindow);
+assert.strictEqual(pangoRight.length, 1, 'only Pango markers inside the window should be kept');
+assert.strictEqual(pangoRight[0].label, 'C23202A');
+var pangoLeft = viz.pangoMarkersForWindow({ start: 1, end: 800, breakpoint: 400 });
+assert.strictEqual(pangoLeft.length, 1, 'indel at 685 is inside 1–800');
+assert.match(pangoLeft[0].label, /REF=AAAGTCATTT/, 'indel overlay keeps full REF allele');
 
 console.log('twoSegmentViz breakpoint scale assertions passed');
