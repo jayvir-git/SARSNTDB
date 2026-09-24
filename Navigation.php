@@ -60,7 +60,7 @@
                     
                     <li class="dropdown
                         <?php 
-                            if(basename($_SERVER['PHP_SELF'])=="GenomeSearch.php" || basename($_SERVER['PHP_SELF'])=="MutationsSearch.php" || basename($_SERVER['PHP_SELF'])=="TwoSegmentStructures.php" || basename($_SERVER['PHP_SELF'])=="RepeatCsvTwoSegment.php" || basename($_SERVER['PHP_SELF'])=="JunctionGroupQuery.php")
+                            if(basename($_SERVER['PHP_SELF'])=="GenomeSearch.php" || basename($_SERVER['PHP_SELF'])=="MutationsSearch.php" || basename($_SERVER['PHP_SELF'])=="PangoMarkers.php" || basename($_SERVER['PHP_SELF'])=="TwoSegmentStructures.php" || basename($_SERVER['PHP_SELF'])=="RepeatCsvTwoSegment.php" || basename($_SERVER['PHP_SELF'])=="JunctionGroupQuery.php")
                             { echo "active"; } 
                             else { echo ""; } 
                         ?>
@@ -71,6 +71,7 @@
                         <ul class="dropdown-menu">
                           <li><a href="GenomeSearch.php"> Genome </a></li>
                           <li><a href="MutationsSearch.php"> Mutations </a></li>
+                          <li><a href="PangoMarkers.php"> Pango markers </a></li>
                           <li><a href="motifvisualizer.php"> Repeats </a></li>
                           <li><a href="TwoSegmentStructures.php"> 2-segment (sgmRNA) </a></li>
                           <li><a href="JunctionGroupQuery.php"> Junction groups </a></li>

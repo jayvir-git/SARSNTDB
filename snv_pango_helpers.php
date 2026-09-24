@@ -52,6 +52,53 @@ if (!function_exists('snv_pango_format_label')) {
     }
 }
 
+if (!function_exists('pango_indel_kind_from_alleles')) {
+    /**
+     * @return 'deletion'|'insertion'|''
+     */
+    function pango_indel_kind_from_alleles($ref, $alt)
+    {
+        $refLen = strlen(strtoupper(trim((string) $ref)));
+        $altLen = strlen(strtoupper(trim((string) $alt)));
+        if ($refLen === $altLen || $refLen < 1 || $altLen < 1) {
+            return '';
+        }
+
+        return $refLen > $altLen ? 'deletion' : 'insertion';
+    }
+}
+
+if (!function_exists('pango_indel_allele_label')) {
+    /**
+     * Coordinate plus full REF/ALT, not SNV-style substitution notation.
+     * Example: 685 deletion REF=AAAGTCATTT ALT=A
+     *
+     * @param int|string $coord
+     * @param string $ref
+     * @param string $alt
+     * @param string $kind
+     */
+    function pango_indel_allele_label($coord, $ref, $alt, $kind = '')
+    {
+        $ref = strtoupper(trim((string) $ref));
+        $alt = strtoupper(trim((string) $alt));
+        $kind = trim((string) $kind);
+        if ($kind === '') {
+            $kind = pango_indel_kind_from_alleles($ref, $alt);
+        } else {
+            $kind = pango_indel_kind_label($kind);
+        }
+        $bits = [(string) ((int) $coord)];
+        if ($kind !== '') {
+            $bits[] = $kind;
+        }
+        $bits[] = 'REF=' . $ref;
+        $bits[] = 'ALT=' . $alt;
+
+        return implode(' ', $bits);
+    }
+}
+
 if (!function_exists('snv_pango_all_map')) {
     /**
      * Map "coord\\tref\\talt" => list of lineage names (sorted).
@@ -125,6 +172,70 @@ if (!function_exists('snv_pango_groups_at_coord')) {
                 'label' => snv_pango_format_label($coord, $parts[1], $parts[2]),
                 'lineages' => $lineages,
             ];
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('snv_pango_all_groups')) {
+    /**
+     * Distinct designation-marker SNVs with lineage lists, ordered by coordinate.
+     *
+     * @return list<array{coordinate:int,reference:string,alternate:string,label:string,lineages:list<string>}>
+     */
+    function snv_pango_all_groups(mysqli $con)
+    {
+        $out = [];
+        foreach (snv_pango_all_map($con) as $key => $lineages) {
+            $parts = explode("\t", $key);
+            if (count($parts) !== 3) {
+                continue;
+            }
+            $coord = (int) $parts[0];
+            $out[] = [
+                'coordinate' => $coord,
+                'reference' => $parts[1],
+                'alternate' => $parts[2],
+                'label' => snv_pango_format_label($coord, $parts[1], $parts[2]),
+                'lineages' => $lineages,
+            ];
+        }
+        usort($out, function ($a, $b) {
+            if ($a['coordinate'] !== $b['coordinate']) {
+                return $a['coordinate'] - $b['coordinate'];
+            }
+            $cmp = strcmp($a['reference'], $b['reference']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcmp($a['alternate'], $b['alternate']);
+        });
+
+        return $out;
+    }
+}
+
+if (!function_exists('snv_pango_in_range')) {
+    /**
+     * @return list<array{coordinate:int,reference:string,alternate:string,label:string,lineages:list<string>}>
+     */
+    function snv_pango_in_range(mysqli $con, $start, $end)
+    {
+        $start = (int) $start;
+        $end = (int) $end;
+        if ($start > $end) {
+            $tmp = $start;
+            $start = $end;
+            $end = $tmp;
+        }
+        $out = [];
+        foreach (snv_pango_all_groups($con) as $row) {
+            if ($row['coordinate'] < $start || $row['coordinate'] > $end) {
+                continue;
+            }
+            $out[] = $row;
         }
 
         return $out;
@@ -240,7 +351,12 @@ if (!function_exists('pango_indel_all_groups')) {
                     'reference' => strtoupper(trim((string) $row['reference'])),
                     'alternate' => strtoupper(trim((string) $row['alternate'])),
                     'kind' => pango_indel_kind_label($row['kind']),
-                    'label' => snv_pango_format_label($row['coordinate'], $row['reference'], $row['alternate']),
+                    'label' => pango_indel_allele_label(
+                        $row['coordinate'],
+                        $row['reference'],
+                        $row['alternate'],
+                        $row['kind']
+                    ),
                     'lineages' => [],
                 ];
             }
@@ -316,12 +432,46 @@ if (!function_exists('pango_indel_groups_at_coord')) {
     }
 }
 
+if (!function_exists('pango_overlay_markers')) {
+    /**
+     * Published Pango SNVs and indels for primer-window guides (not group observations).
+     *
+     * @return list<array{coordinate:int,reference:string,alternate:string,kind:string,label:string,source:string}>
+     */
+    function pango_overlay_markers(mysqli $con)
+    {
+        $out = [];
+        foreach (snv_pango_all_groups($con) as $row) {
+            $out[] = [
+                'coordinate' => $row['coordinate'],
+                'reference' => $row['reference'],
+                'alternate' => $row['alternate'],
+                'kind' => 'snv',
+                'label' => $row['label'],
+                'source' => 'pango',
+            ];
+        }
+        foreach (pango_indel_all_groups($con) as $row) {
+            $out[] = [
+                'coordinate' => $row['coordinate'],
+                'reference' => $row['reference'],
+                'alternate' => $row['alternate'],
+                'kind' => 'indel',
+                'label' => $row['label'],
+                'source' => 'pango',
+            ];
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('snv_overlay_variants')) {
     /**
-     * SNVs from the mutations table at or above the Detail frequency floor
-     * (Jim's nearby overlay; email said "<= 1%" but the 23202 test is ~8%).
+     * SNVs from John's Original `mutations` table at or above the Detail frequency floor.
+     * Not the selected VCF group. Email said "<= 1%" but the 23202 test is ~8%.
      *
-     * @return list<array{coordinate:int,reference:string,alternate:string,label:string}>
+     * @return list<array{coordinate:int,reference:string,alternate:string,label:string,source:string,source_label:string}>
      */
     function snv_overlay_variants(mysqli $con, $minPercent = 1.0)
     {
@@ -352,6 +502,8 @@ if (!function_exists('snv_overlay_variants')) {
                 'reference' => $row['reference'],
                 'alternate' => $row['alternate'],
                 'label' => snv_pango_format_label($row['coordinate'], $row['reference'], $row['alternate']),
+                'source' => 'original_mutations',
+                'source_label' => 'Original mutations table (≥1% of ' . (int) $total . ' samples)',
             ];
         }
         $res->free();

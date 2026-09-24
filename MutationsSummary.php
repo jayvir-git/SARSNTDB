@@ -1,5 +1,5 @@
 <?php
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 error_reporting(E_ALL);
 ?>
 
@@ -75,7 +75,18 @@ error_reporting(E_ALL);
     }
 
     require_once('./connection.php');
+    require_once __DIR__ . '/vcf_snv_helpers.php';
     mysqli_report(MYSQLI_REPORT_OFF);
+    $vcfGroupCode = vcf_snv_request_group();
+    $vcfMinAf = vcf_snv_request_min_af();
+    $vcfHidden = $vcfGroupCode !== '' && !vcf_snv_group_is_visible($vcfGroupCode);
+    $vcfGroupRow = ($vcfGroupCode !== '' && !$vcfHidden) ? vcf_snv_group_row($con, $vcfGroupCode) : null;
+    $useVcfGroup = $vcfGroupRow !== null || $vcfHidden;
+    if ($vcfHidden) {
+      $result_rows = [];
+    } elseif ($useVcfGroup) {
+      $result_rows = vcf_snv_summary_instrument_rows($con, $vcfGroupCode, $vcfMinAf, $start, $end, $region);
+    } else {
     $sql = "SELECT
               reference,
               instrument,
@@ -112,7 +123,8 @@ error_reporting(E_ALL);
       exit();
     }
     $result_rows = $result->fetch_all(MYSQLI_ASSOC);
-    $total = $result->num_rows;
+    }
+    $total = count($result_rows);
 
     $illumina_miseq = $illumina_novaseq_6000 = $nextseq_500 = $nextseq_550 = $illumina_hiseq_2500 = $minion = $BGI_MGISEQ_2000 = array();
     foreach($result_rows as $row) {
@@ -161,6 +173,11 @@ error_reporting(E_ALL);
              where 1=1 $q1
               group by g.Protein, g.Start, g.End, m.coordinate";
 
+    if ($vcfHidden) {
+      $result2_rows = [];
+    } elseif ($useVcfGroup) {
+      $result2_rows = vcf_snv_frequency_rows($con, $vcfGroupCode, $vcfMinAf, $start, $end, $region);
+    } else {
     $result2 = $con->query($sql2);
     // echo ($sql2);
 
@@ -171,6 +188,10 @@ error_reporting(E_ALL);
     }
 
     $result2_rows = $result2->fetch_all(MYSQLI_ASSOC);
+    }
+    $xAxisGraphStart = 0;
+    $xAxisGraphEnd = 30000;
+    $gap = 100;
     if($selection == 'region') {
       foreach($result2_rows as $row) {
         $xAxisGraphStart = intval($row['Start']);
@@ -615,7 +636,7 @@ error_reporting(E_ALL);
 
 
     $obj = new MutationsInfo();
-    $obj->mutationsByInstrument[] = array(
+    $instrumentBlock = array(
                       "datagridHTML" => $data,
                       "illumina_miseq" => $illumina_miseq,
                       "illumina_novaseq_6000" => $illumina_novaseq_6000,
@@ -626,6 +647,15 @@ error_reporting(E_ALL);
                       "BGI_MGISEQ_2000" => $BGI_MGISEQ_2000
 
                     );
+    if ($vcfHidden) {
+      $instrumentBlock['group_label'] = $vcfGroupCode . ' (hidden)';
+      $instrumentBlock['datagridHTML'] = '<p>This VCF group is hidden by the Sep 17 workbook restriction. Original dataset was not used.</p>';
+      $instrumentBlock['group_series'] = [];
+    } elseif ($useVcfGroup) {
+      $instrumentBlock['group_label'] = $vcfGroupRow['label'];
+      $instrumentBlock['group_series'] = vcf_snv_group_series_points($result_rows, $vcfGroupRow['label']);
+    }
+    $obj->mutationsByInstrument[] = $instrumentBlock;
 
     $obj->mutationsByFrequency[] = array(      
       "Total" => $A

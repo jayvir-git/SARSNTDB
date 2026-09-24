@@ -175,6 +175,18 @@
 
 <?php
   require_once('./connection.php');
+  require_once __DIR__ . '/nj_read_helpers.php';
+  $vcfGroups = vcf_snv_fetch_groups($con);
+  $vcfDefaultGroup = '';
+  foreach ($vcfGroups as $vcfGroupRow) {
+    if ($vcfGroupRow['code'] === vcf_snv_default_group_code()) {
+      $vcfDefaultGroup = $vcfGroupRow['code'];
+      break;
+    }
+  }
+  if ($vcfDefaultGroup === '' && $vcfGroups) {
+    $vcfDefaultGroup = $vcfGroups[0]['code'];
+  }
   $geneRegionMap = [];
   $geneResult = $con->query("SELECT Protein, Start, End FROM gene_1 ORDER BY Start");
   if ($geneResult) {
@@ -211,6 +223,38 @@
     <div class="form-group" style="height:10%; width:100%;">
       <div class="row">
         <fieldset id="Mutations_row">
+          <?php if ($vcfGroups) : ?>
+          <div class="row mutation-search-row">
+            <div class="col-md-12">
+              <p class="mutation-search-label">VCF sample group</p>
+            </div>
+            <div class="col-md-5">
+              <label for="VcfGroup">Group</label>
+              <select class="form-control" id="VcfGroup">
+                <option value="original" data-label="Original (John)" data-count="18900">Original (John, 18900 samples)</option>
+                <?php foreach ($vcfGroups as $vcfGroupRow) : ?>
+                <option value="<?php echo htmlspecialchars($vcfGroupRow['code'], ENT_QUOTES, 'UTF-8'); ?>"
+                  data-label="<?php echo htmlspecialchars($vcfGroupRow['label'], ENT_QUOTES, 'UTF-8'); ?>"
+                  data-count="<?php echo (int) $vcfGroupRow['sample_count']; ?>"
+                  data-vcf-count="<?php echo (int) $vcfGroupRow['vcf_sample_count']; ?>"
+                  data-many="<?php echo nj_read_many_project_file($vcfGroupRow['code']) !== null ? '1' : '0'; ?>"
+                  <?php echo $vcfGroupRow['code'] === $vcfDefaultGroup ? ' selected' : ''; ?>>
+                  <?php echo htmlspecialchars(vcf_snv_group_menu_label($vcfGroupRow), ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+              <small class="text-muted field-hint">One group at a time. n is samples with a VCF, a PASS call, and a row in that group’s NJ sample list. Junction percents are on Junction groups. Original is unchanged.</small>
+              <div id="manyProjectsWrap" style="margin-top:6px; display:none;">
+                <a id="manyProjectsLink" href="VcfGroupProjects.php">View the project accessions in this group</a>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label for="MinAf">Min allele frequency</label>
+              <input id="MinAf" type="number" class="form-control" min="0" max="1" step="0.01" value="0.8" title="A sample counts only if its VCF AF is at least this value"/>
+              <small class="text-muted field-hint">Default 0.8; ignored for Original</small>
+            </div>
+          </div>
+          <?php endif; ?>
           
           <div class="row mutation-search-row">
             <div class="col-md-12">
@@ -295,11 +339,12 @@
 
 
       <div class="tab">
-        <button class="tablinks active" id="summaryTab" onclick="activateMutationsResultTab('summaryTab', 'mutationsSummary')">Summary</button>
-        <button class="tablinks" id="detailTab" onclick="activateMutationsResultTab('detailTab', 'mutationsDetail')">Detail</button>
+        <button class="tablinks" id="summaryTab" onclick="activateMutationsResultTab('summaryTab', 'mutationsSummary')">Summary</button>
+        <button class="tablinks active" id="detailTab" onclick="activateMutationsResultTab('detailTab', 'mutationsDetail')">Detail</button>
+        <a id="mutationsExportCsv" class="btn btn-default btn-sm" style="float:right; margin:6px 8px 0 0;" href="#">Export displayed CSV</a>
       </div>
 
-      <div id="mutSummary" >
+      <div id="mutSummary" style="display:none;">
         <div id="mutationsSummary" class="datacontainer">
           <div id="datagrid" class="datagrid"></div>
           <div id="mutationsChart" class="datagraph"></div>    
@@ -357,8 +402,8 @@
 
         
       </div>
-      <div id="mutationsDetail" class="datacontainer" style="display:none;"> 
-          <i id="detailScopeHint">Detail view of the mutations. Select a region or set Start/End with Region = All. Rows below 1% frequency are hidden (raise Min % Frequency to filter further). Click a row to open primers ±800 bp around that SNV. Pango lineages appear when the designation-marker rule matches. Pango indels are listed in a second table.</i>
+      <div id="mutationsDetail" class="datacontainer" style="display:flex;"> 
+          <i id="detailScopeHint">Detail view of the mutations. Select a region or set Start/End with Region = All. Rows below 1% frequency are hidden (raise Min % Frequency to filter further). VCF groups also require Min allele frequency (default 0.8). Click a row to open primers ±800 bp around that SNV. Pango lineages on a row are published designation markers matching that SNV, not counts from this group. Published Pango SNVs and indels are on the Pango markers page.</i>
       </div>
     </div>  
 	</div>
@@ -366,8 +411,78 @@
   <script>
 
     var geneRegionMap = <?php echo json_encode($geneRegionMap); ?>;
+    var vcfDefaultGroup = <?php echo json_encode($vcfDefaultGroup); ?>;
     var activeSearchMode = "coordinates";
     var activeMinPercent = "1";
+    var mutationsFetchGen = 0;
+    var mutationsSummaryReq = null;
+    var mutationsDetailReq = null;
+
+    function selectedVcfGroup() {
+      var el = document.getElementById("VcfGroup");
+      return el ? el.value : "original";
+    }
+
+    function syncManyProjectsLink() {
+      var el = document.getElementById("VcfGroup");
+      var wrap = document.getElementById("manyProjectsWrap");
+      var link = document.getElementById("manyProjectsLink");
+      if (!wrap || !link) {
+        return;
+      }
+      var opt = el && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+      var many = opt && opt.getAttribute("data-many") === "1" && el.value !== "original";
+      wrap.style.display = many ? "block" : "none";
+      if (many) {
+        link.href = "VcfGroupProjects.php?group=" + encodeURIComponent(el.value);
+      }
+    }
+
+    function selectedVcfGroupMeta() {
+      var el = document.getElementById("VcfGroup");
+      if (!el || el.value === "original") {
+        return { code: "original", label: "Original (John)", count: "18900" };
+      }
+      var opt = el.options[el.selectedIndex];
+      return {
+        code: el.value,
+        label: (opt && opt.getAttribute("data-label")) || el.value,
+        count: (opt && opt.getAttribute("data-count")) || ""
+      };
+    }
+
+    function selectedMinAf() {
+      var el = document.getElementById("MinAf");
+      if (!el) {
+        return "0.8";
+      }
+      var value = parseFloat(el.value);
+      if (isNaN(value)) {
+        return "0.8";
+      }
+      return String(value);
+    }
+
+    function vcfQuerySuffix() {
+      return "&Group="+encodeURIComponent(selectedVcfGroup())+"&MinAf="+encodeURIComponent(selectedMinAf());
+    }
+
+    function escapeHtmlText(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function mutationsCsvHref(start, end, region, minPercent) {
+      var r = (region === "All" || !region) ? "" : region;
+      return "MutationsDetailCsv.php?Region="+encodeURIComponent(r)
+        +"&Start="+encodeURIComponent(start || "")
+        +"&End="+encodeURIComponent(end || "")
+        +"&MinPercent="+encodeURIComponent(minPercent)
+        +vcfQuerySuffix();
+    }
 
     function applyRegionCoordinates(region) {
       if (region !== "All" && geneRegionMap[region]) {
@@ -385,6 +500,14 @@
       document.getElementById("Region").value= "All";
       document.getElementById("MinPercentCoord").value="1";
       document.getElementById("MinPercentRegion").value="1";
+      var groupEl = document.getElementById("VcfGroup");
+      if (groupEl && vcfDefaultGroup) {
+        groupEl.value = vcfDefaultGroup;
+      }
+      var minAfEl = document.getElementById("MinAf");
+      if (minAfEl) {
+        minAfEl.value = "0.8";
+      }
       activeSearchMode = "coordinates";
       activeMinPercent = "1";
     }
@@ -696,6 +819,15 @@
         var clearRegionButton = document.getElementById("clear_region_btn");
         clearRegionButton.addEventListener("click", clearRegionSearch);
 
+        var groupEl = document.getElementById("VcfGroup");
+        if (groupEl) {
+          groupEl.addEventListener("change", function () {
+            syncManyProjectsLink();
+            refreshCurrentMutationsSearch();
+          });
+        }
+        syncManyProjectsLink();
+
         submitCoordinateSearch();
 
         function clearCoordinateSearch() {
@@ -748,14 +880,46 @@
           document.getElementById("Region").value= "All";
           document.getElementById("MinPercentCoord").value="1";
           document.getElementById("MinPercentRegion").value="1";
+          var groupEl = document.getElementById("VcfGroup");
+          if (groupEl && vcfDefaultGroup) {
+            groupEl.value = vcfDefaultGroup;
+          }
+          var minAfEl = document.getElementById("MinAf");
+          if (minAfEl) {
+            minAfEl.value = "0.8";
+          }
           activeSearchMode = "coordinates";
           activeMinPercent = "1";
         }
 
         function getData(start,end,region,minPercent){
+          var gen = ++mutationsFetchGen;
+          var minPercentValue = (typeof minPercent === "undefined") ? activeMinPercent : minPercent;
+          var queryRegion = (region === "All" || !region) ? "" : region;
+          var meta = selectedVcfGroupMeta();
+          var csvLink = document.getElementById("mutationsExportCsv");
+          if (csvLink) {
+            csvLink.href = mutationsCsvHref(start, end, region, minPercentValue);
+          }
+          var mutationsDetailEle = document.getElementById("mutationsDetail");
+          if (mutationsDetailEle) {
+            mutationsDetailEle.innerHTML = "<i>Loading " + escapeHtmlText(meta.label) +
+              (meta.count ? " (n=" + escapeHtmlText(meta.count) + ")" : "") + "…</i>";
+          }
+          activateMutationsResultTab("detailTab", "mutationsDetail");
+          if (mutationsSummaryReq) {
+            try { mutationsSummaryReq.abort(); } catch (eAbort) {}
+          }
+          if (mutationsDetailReq) {
+            try { mutationsDetailReq.abort(); } catch (eAbort) {}
+          }
           var xmlhttp = new XMLHttpRequest();
+          mutationsSummaryReq = xmlhttp;
             xmlhttp.onreadystatechange = function() {
               if (this.readyState == 4 && this.status == 200) {
+                if (gen !== mutationsFetchGen) {
+                  return;
+                }
                 // console.log(this.responseText);
                 var res = JSON.parse(this.responseText);
                 
@@ -765,7 +929,17 @@
 
                   mutationsChartData.splice(0,mutationsChartData.length);
 
-                  mutationsChartData.push({
+                  if (res.mutationsByInstrument[i].group_series) {
+                    mutationsChart.options.title.text = "Mutations in " + (res.mutationsByInstrument[i].group_label || "group");
+                    mutationsChartData.push({
+                      type: "stackedColumn",
+                      showInLegend: true,
+                      name: res.mutationsByInstrument[i].group_label || "group",
+                      dataPoints: res.mutationsByInstrument[i].group_series
+                    });
+                  } else {
+                    mutationsChart.options.title.text = "Mutations by instrument";
+                    mutationsChartData.push({
                       type: "stackedColumn",
                       showInLegend: true,
                       name: "illumina_miseq",
@@ -803,6 +977,7 @@
                   }
                   
                   );
+                  }
                   mutationsChart.render();
                 }
                 for (i = 0; i < res.mutationsByFrequency.length; i++) { 
@@ -870,24 +1045,52 @@
               }
             }
           }
-          if (region=="All"){
-            region="";
-          }
-          //xmlhttp.open("GET", "MutationsSummary.php?Region="+region+"&ReferenceBase="+referenceBase+"&AlternateBase="+alternateBase+"&Instrument="+instrument+"&Start="+start+"&End="+end, true);
-          xmlhttp.open("GET", "MutationsSummary.php?Region="+region+"&Start="+start+"&End="+end, true);
+          xmlhttp.open("GET", "MutationsSummary.php?Region="+queryRegion+"&Start="+start+"&End="+end+vcfQuerySuffix(), true);
           xmlhttp.send();
 
-          var xmlhttp = new XMLHttpRequest();
-          xmlhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) { 
+          var detailReq = new XMLHttpRequest();
+          mutationsDetailReq = detailReq;
+          detailReq.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+              if (gen !== mutationsFetchGen) {
+                return;
+              }
               var mutationsDetailEle = document.getElementById("mutationsDetail");
               mutationsDetailEle.innerHTML = this.responseText;
             }
+          };
+          detailReq.open("GET", "MutationsDetail.php?Region="+queryRegion+"&Start="+start+"&End="+end+"&MinPercent="+encodeURIComponent(minPercentValue)+vcfQuerySuffix(), true);
+          detailReq.send();
+        }
+
+        function refreshCurrentMutationsSearch() {
+          document.getElementById("emptyText").style.display = "none";
+          document.getElementById("mutationsData").style.display = "block";
+          if (activeSearchMode === "region") {
+            var region = document.getElementById("Region").value;
+            if (region === "All") {
+              activeSearchMode = "coordinates";
+              activeMinPercent = document.getElementById("MinPercentCoord").value;
+              getData(
+                document.getElementById("Start").value,
+                document.getElementById("End").value,
+                "All",
+                activeMinPercent
+              );
+              return;
+            }
+            activeMinPercent = document.getElementById("MinPercentRegion").value;
+            applyRegionCoordinates(region);
+            getData("", "", region, activeMinPercent);
+            return;
           }
-          //xmlhttp.open("GET", "MutationsDetail.php?Region="+region+"&ReferenceBase="+referenceBase+"&AlternateBase="+alternateBase+"&Instrument="+instrument+"&Start="+start+"&End="+end, true);
-          var minPercentValue = (typeof minPercent === "undefined") ? activeMinPercent : minPercent;
-          xmlhttp.open("GET", "MutationsDetail.php?Region="+region+"&Start="+start+"&End="+end+"&MinPercent="+encodeURIComponent(minPercentValue), true);
-          xmlhttp.send();
+          activeMinPercent = document.getElementById("MinPercentCoord").value;
+          getData(
+            document.getElementById("Start").value,
+            document.getElementById("End").value,
+            "All",
+            activeMinPercent
+          );
         }
       }
 
@@ -958,6 +1161,19 @@
     
         document.getElementById("mutationsDetail").addEventListener("click", function (e) {
           var t = e.target;
+          var copyBtn = t && t.closest ? t.closest("button.snv-copy-fasta") : null;
+          if (copyBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            var prot = copyBtn.getAttribute("data-prot") || "";
+            var seq = copyBtn.getAttribute("data-seq") || "";
+            var copyText = ">"+prot+"\n"+seq;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(copyText);
+            }
+            alert("Copied the canonical protein FASTA for " + prot + ". SNAP2 is not run from this page.");
+            return;
+          }
           if (t && t.closest && t.closest("button")) {
             return;
           }
@@ -982,19 +1198,11 @@
         });
 
         function copyFunction(prot,seq) {
-        // Get the text field
         var copyText = ">"+prot+"\n"+seq;
-
-        // Select the text field
-        // copyText.select();
-        // copyText.setSelectionRange(0, 99999); // For mobile devices
-
-        // Copy the text inside the text field
-        navigator.clipboard.writeText(copyText);
-
-        // Alert the copied text
-        alert("Copied "+prot+" to clipboard, redirecting to SNAP2 webpage");
-        document.location.href = "https://rostlab.org/services/snap2web/";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(copyText);
+        }
+        alert("Copied the canonical protein FASTA for " + prot + ". SNAP2 is not run from this page.");
       }
     
     </script>

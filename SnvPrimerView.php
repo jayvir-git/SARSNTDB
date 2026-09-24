@@ -30,6 +30,7 @@ $snvPrimers = [];
 $pangoLineages = [];
 $pangoGroups = [];
 $overlaySnvs = [];
+$pangoOverlay = [];
 $dbError = null;
 $primerDbError = null;
 
@@ -37,6 +38,7 @@ if ($coord < 1 || $coord > 29903) {
     $dbError = 'Pass a genome coordinate in ?coord= (1–29903). Example: SnvPrimerView.php?coord=23202';
 } elseif (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $overlaySnvs = snv_overlay_variants($con, 1.0);
+    $pangoOverlay = pango_overlay_markers($con);
     if ($variantKind === 'indel') {
         if ($refBase !== '' && $altBase !== '') {
             $pangoLineages = pango_indel_lineages_for($con, $coord, $refBase, $altBase);
@@ -70,11 +72,13 @@ if ($coord < 1 || $coord > 29903) {
     $dbError = 'Database connection not available.';
 }
 
-$snvLabel = ($refBase !== '' && $altBase !== '')
-    ? snv_pango_format_label($coord, $refBase, $altBase)
-    : (($variantKind === 'indel' ? 'Indel ' : 'SNV ') . $coord);
+$snvLabel = ($variantKind === 'indel' && $refBase !== '' && $altBase !== '')
+    ? pango_indel_allele_label($coord, $refBase, $altBase, pango_indel_kind_from_alleles($refBase, $altBase))
+    : (($refBase !== '' && $altBase !== '')
+        ? snv_pango_format_label($coord, $refBase, $altBase)
+        : (($variantKind === 'indel' ? 'Indel ' : 'SNV ') . $coord));
 $titleBits = [$snvLabel];
-if ($variantKind === 'indel') {
+if ($variantKind === 'indel' && strpos($snvLabel, 'REF=') === false) {
     array_unshift($titleBits, 'Indel');
 }
 if ($protein !== '') {
@@ -98,7 +102,7 @@ foreach ($snvPrimers as $primer) {
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?> — primers — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260911-nearby2" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260917-pango" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -117,17 +121,19 @@ foreach ($snvPrimers as $primer) {
             Primers whose start or end is within <strong>&plusmn;<?php echo (int) $primerWindow; ?> nt</strong>
             of this <?php echo $variantKind === 'indel' ? 'indel' : 'SNV'; ?>
             (same window idea as junction primer arrows).
-            Pale dotted lines are other SNVs in the window at or above the 1% sample cutoff.
+            Pale dotted lines are other SNVs from the Original mutations table (John; ≥1% of 18,900 samples), not the selected VCF group.
+            Blue-gray dashed lines are published Pango designation markers in the window.
+            See the <a href="PangoMarkers.php">Pango markers</a> page for the full tables.
             <a href="MutationsSearch.php">Back to Mutations search</a>.
         </p>
         <?php if ($pangoLineages) : ?>
             <p style="font-size:13px; max-width:900px;">
-                <strong>Pango lineages</strong> (designation markers, ratio &lt; 0.2):
+                <strong>Pango lineages</strong> (published designation markers, ratio &lt; 0.2; not a group observation):
                 <?php echo snv_pango_html_list($pangoLineages); ?>
             </p>
         <?php elseif ($pangoGroups) : ?>
             <div style="font-size:13px; max-width:900px;">
-                <strong>Pango lineages</strong> at this coordinate (designation markers, ratio &lt; 0.2):
+                <strong>Pango lineages</strong> at this coordinate (published designation markers, ratio &lt; 0.2; not a group observation):
                 <ul style="margin:6px 0 0 18px;">
                     <?php foreach ($pangoGroups as $group) : ?>
                     <li>
@@ -198,7 +204,7 @@ foreach ($snvPrimers as $primer) {
             <span class="tsg-nearby-toggle">
                 <label class="checkbox-inline">
                     <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
-                    Show nearby SNVs
+                    Show nearby SNVs (Original table ≥1%; Pango markers dashed)
                 </label>
             </span>
             <?php if ($primersByScheme) : ?>
@@ -238,9 +244,10 @@ window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
 window.TSG_SELECTED_PRIMER_ID = <?php echo tsg_json_for_script($selectedPrimerId); ?>;
 window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
+window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
-<script src="JS/twoSegmentViz.js?v=20260911-nearby2"></script>
+<script src="JS/twoSegmentViz.js?v=20260917-pango"></script>
 <script>
 (function () {
     var sel = document.getElementById('tsgPrimerSelect');
