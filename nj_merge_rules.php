@@ -170,36 +170,53 @@ if (!function_exists('nj_read_bucket_is_merged_omicron')) {
 
 if (!function_exists('nj_read_group_type')) {
     /**
+     * Alpha or Delta with no later Omicron is Omi-. BA.1 on that group is Omi-,BA.1.
+     * Alpha or Delta plus BA.2–5 or XBB is LTG. Both of those later groups make it long LTG.
+     * BA.2–5 and XBB with no Alpha or Delta is long Omi+. One of them alone is Omi+.
+     * BA.1 never creates LTG or Omi+.
+     *
      * @param array<string,int> $variantCounts
      */
     function nj_read_group_type(array $variantCounts, $minSamples)
     {
         $minSamples = (int) $minSamples;
-        $has = ['alpha' => false, 'delta' => false, 'omicron' => false];
+        $has = [
+            'alpha' => false,
+            'delta' => false,
+            'ba' => false,
+            'xbb' => false,
+            'ba1' => false,
+            'omicron_other' => false,
+        ];
         foreach ($variantCounts as $label => $count) {
             if ((int) $count < $minSamples) {
                 continue;
             }
             $bucket = nj_read_variant_bucket($label);
-            if ($bucket === 'alpha') {
-                $has['alpha'] = true;
-            } elseif ($bucket === 'delta') {
-                $has['delta'] = true;
-            } elseif (nj_read_bucket_is_merged_omicron($bucket)) {
-                $has['omicron'] = true;
+            if ($bucket !== null && isset($has[$bucket])) {
+                $has[$bucket] = true;
             }
         }
-        if ($has['alpha'] && $has['delta'] && $has['omicron']) {
-            return 'LTG';
+        $early = $has['alpha'] || $has['delta'];
+        $later = $has['ba'] || $has['xbb'] || $has['omicron_other'];
+        if ($early && $has['ba'] && $has['xbb']) {
+            $type = 'long LTG';
+        } elseif ($early && $later) {
+            $type = 'LTG';
+        } elseif ($early) {
+            $type = 'Omi-';
+        } elseif ($has['ba'] && $has['xbb']) {
+            $type = 'long Omi+';
+        } elseif ($later) {
+            $type = 'Omi+';
+        } else {
+            $type = '';
         }
-        if ($has['alpha'] && $has['delta'] && !$has['omicron']) {
-            return 'Omni−';
-        }
-        if ($has['omicron'] && !$has['alpha'] && !$has['delta']) {
-            return 'Omni+';
+        if ($type === 'Omi-' && $has['ba1']) {
+            return 'Omi-,BA.1';
         }
 
-        return '';
+        return $type;
     }
 }
 
@@ -628,6 +645,410 @@ if (!function_exists('nj_read_count_text')) {
     }
 }
 
+if (!function_exists('nj_read_pair_label_in_block')) {
+    /**
+     * @param string $label
+     * @param string $block
+     */
+    function nj_read_pair_label_in_block($label, $block)
+    {
+        $label = (string) $label;
+        if ($block === 'ba2') {
+            return (bool) preg_match('/BA\.2(?!\d)/i', $label);
+        }
+        if ($block === 'ba5') {
+            return (bool) preg_match('/BA\.5(?!\d)/i', $label);
+        }
+        $bucket = nj_read_variant_bucket($label);
+        if ($block === 'delta') {
+            return $bucket === 'delta' || $label === 'Delta';
+        }
+        if ($block === 'ba1') {
+            return $bucket === 'ba1';
+        }
+        if ($block === 'ba') {
+            return $bucket === 'ba' || $label === 'BA.2–5';
+        }
+        if ($block === 'xbb') {
+            return $bucket === 'xbb' || $label === 'XBB';
+        }
+        if ($block === 'omicron') {
+            return $label === 'Omicron' || nj_read_bucket_is_merged_omicron($bucket);
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('nj_read_pair_keys_fit')) {
+    /**
+     * @param list<string> $keys
+     */
+    function nj_read_pair_keys_fit(array $keys, $block, $primer)
+    {
+        foreach ($keys as $key) {
+            $bar = strpos((string) $key, '|');
+            if ($bar === false) {
+                continue;
+            }
+            $variant = substr((string) $key, 0, $bar);
+            $keyPrimer = substr((string) $key, $bar + 1);
+            if ($keyPrimer === $primer && nj_read_pair_label_in_block($variant, $block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('nj_read_pair_filter_columns')) {
+    /**
+     * Variant–primer filter columns. Alpha is omitted: it is V3 only.
+     * Unchecked Merge BA.2–5 shows BA.2 and BA.5. Checked shows BA.2–5.
+     * The filter table passes no selected list, so every primer column stays.
+     * A shorter selected-pair list drops columns that were cleared.
+     *
+     * @param array<string,mixed> $options
+     * @param list<string>|null $selectedKeys
+     * @return list<array{top:string,sub:string,buckets:list<string>,primers:list<string>,block:string}>
+     */
+    function nj_read_pair_filter_columns($options = [], $selectedKeys = null)
+    {
+        $opt = nj_read_coerce_merge($options);
+        $primers = [
+            'V3' => 'COVID-ARTIC-V3',
+            'V4.1' => 'COVID-ARTIC-V4.1',
+            'V5.0' => 'COVID-ARTIC-V5.0-5.3.2_400',
+            'Mid' => 'COVID-MIDNIGHT-1200',
+            'Vsk' => 'COVID-VARSKIP-V1a-2b',
+        ];
+        $blocks = [
+            ['id' => 'delta', 'top' => 'Delta', 'buckets' => ['delta']],
+        ];
+        if (empty($opt['hide_ba1'])) {
+            $blocks[] = ['id' => 'ba1', 'top' => 'BA.1', 'buckets' => ['ba1']];
+        }
+        if (!empty($opt['merge_omicron'])) {
+            $blocks[] = ['id' => 'omicron', 'top' => 'Omicron', 'buckets' => ['ba', 'xbb', 'omicron_other']];
+        } else {
+            if (!empty($opt['merge_ba'])) {
+                $blocks[] = ['id' => 'ba', 'top' => 'BA.2–5', 'buckets' => ['ba']];
+            } else {
+                $blocks[] = ['id' => 'ba2', 'top' => 'BA.2', 'buckets' => ['ba']];
+                $blocks[] = ['id' => 'ba5', 'top' => 'BA.5', 'buckets' => ['ba']];
+            }
+            $blocks[] = ['id' => 'xbb', 'top' => 'XBB', 'buckets' => ['xbb']];
+        }
+        $cols = [];
+        foreach ($blocks as $block) {
+            foreach ($primers as $abbrev => $full) {
+                if ($selectedKeys !== null && !nj_read_pair_keys_fit($selectedKeys, $block['id'], $full)) {
+                    continue;
+                }
+                $cols[] = [
+                    'top' => $block['top'],
+                    'sub' => $abbrev,
+                    'buckets' => $block['buckets'],
+                    'primers' => [$full],
+                    'block' => $block['id'],
+                ];
+            }
+        }
+
+        return $cols;
+    }
+}
+
+if (!function_exists('nj_read_filter_columns')) {
+    /**
+     * Columns for the filter table. Pair mode keeps every primer column.
+     * The checklist below does not remove these.
+     *
+     * @param array<string,mixed> $options
+     * @return list<array{top:string,sub:string,buckets:list<string>,primers:list<string>|null,block?:string}>
+     */
+    function nj_read_filter_columns($mode, array $options = [])
+    {
+        $mode = in_array($mode, ['variant', 'primer', 'pair'], true) ? $mode : 'pair';
+        if ($mode === 'pair') {
+            return nj_read_pair_filter_columns($options);
+        }
+        if ($mode === 'variant') {
+            return [
+                ['top' => '', 'sub' => 'Alpha', 'buckets' => ['alpha'], 'primers' => null],
+                ['top' => '', 'sub' => 'Delta', 'buckets' => ['delta'], 'primers' => null],
+                ['top' => '', 'sub' => 'BA.1', 'buckets' => ['ba1'], 'primers' => null],
+                ['top' => '', 'sub' => 'BA.2–5', 'buckets' => ['ba'], 'primers' => null],
+                ['top' => '', 'sub' => 'XBB', 'buckets' => ['xbb'], 'primers' => null],
+            ];
+        }
+        $primers = [
+            'V3' => 'COVID-ARTIC-V3',
+            'V4.1' => 'COVID-ARTIC-V4.1',
+            'V5.0' => 'COVID-ARTIC-V5.0-5.3.2_400',
+            'Mid' => 'COVID-MIDNIGHT-1200',
+            'Vsk' => 'COVID-VARSKIP-V1a-2b',
+        ];
+        $buckets = ['alpha', 'delta', 'ba1', 'ba', 'xbb', 'omicron_other', 'other'];
+        $cols = [];
+        foreach ($primers as $abbrev => $full) {
+            $cols[] = ['top' => '', 'sub' => $abbrev, 'buckets' => $buckets, 'primers' => [$full]];
+        }
+
+        return $cols;
+    }
+}
+
+if (!function_exists('nj_read_filter_download_name')) {
+    function nj_read_filter_download_name($mode, $minSamples)
+    {
+        $mode = in_array($mode, ['variant', 'primer', 'pair'], true) ? $mode : 'pair';
+        $bases = [
+            'variant' => 'filter-variants',
+            'primer' => 'filter-primers',
+            'pair' => 'filter-variant-primer-pairs',
+        ];
+
+        return $bases[$mode] . '_min' . (int) $minSamples . '.csv';
+    }
+}
+
+if (!function_exists('nj_read_filter_table')) {
+    /**
+     * Same cells as the filter table on JunctionGroupQuery.php.
+     *
+     * @param list<array<string,mixed>> $groups
+     * @param array<int,array<string,array<string,int>>> $denomsByGroup
+     * @param array<int,int> $earlyCounts
+     * @param array<string,mixed> $options
+     * @return array{mode:string,columns:list<array<string,mixed>>,header_rows:list<list<string>>,rows:list<list<string>>}
+     */
+    function nj_read_filter_table(array $groups, array $denomsByGroup, array $earlyCounts, $mode, array $options)
+    {
+        $mode = in_array($mode, ['variant', 'primer', 'pair'], true) ? $mode : 'pair';
+        $opt = nj_read_coerce_merge($options);
+        $cols = nj_read_filter_columns($mode, $opt);
+        if ($mode === 'pair') {
+            $top = ['Group'];
+            $sub = [''];
+            foreach ($cols as $col) {
+                $top[] = (string) $col['top'];
+                $sub[] = (string) $col['sub'];
+            }
+            $headerRows = [$top, $sub];
+        } elseif ($mode === 'variant') {
+            $head = ['Group', 'Type', 'Early'];
+            foreach ($cols as $col) {
+                $head[] = (string) $col['sub'];
+            }
+            $headerRows = [$head];
+        } else {
+            $head = ['Group'];
+            foreach ($cols as $col) {
+                $head[] = (string) $col['sub'];
+            }
+            $headerRows = [$head];
+        }
+        $rows = [];
+        foreach ($groups as $group) {
+            $groupId = (int) $group['id'];
+            $denoms = isset($denomsByGroup[$groupId]) ? $denomsByGroup[$groupId] : [];
+            $line = [(string) $group['label']];
+            if ($mode === 'variant') {
+                $line[] = nj_read_group_type(nj_read_variant_totals($denoms), $opt['min_samples']);
+                $earlyN = isset($earlyCounts[$groupId]) ? (int) $earlyCounts[$groupId] : 0;
+                $line[] = nj_read_count_text([$earlyN], $opt['min_samples'], !empty($opt['show_below']));
+            }
+            foreach ($cols as $col) {
+                $line[] = nj_read_grouped_count(
+                    $denoms,
+                    $col['buckets'],
+                    $col['primers'],
+                    $opt,
+                    isset($col['block']) ? $col['block'] : null
+                );
+            }
+            $rows[] = $line;
+        }
+
+        return [
+            'mode' => $mode,
+            'columns' => $cols,
+            'header_rows' => $headerRows,
+            'rows' => $rows,
+        ];
+    }
+}
+
+if (!function_exists('nj_read_group_file_abbrev')) {
+    /**
+     * Short download name. The groups sheet has no abbreviation column.
+     */
+    function nj_read_group_file_abbrev($code)
+    {
+        $map = [
+            'PRJEB46220-Argentina' => 'Arg',
+            'Port-PRJEB47340' => 'Port550',
+            'Port_miseq' => 'Port',
+            'NJ-PRJNA708324' => 'NJ',
+            'NM' => 'NM',
+            'VA' => 'VA',
+            'Austr-PRJNA613958_nextseq500' => 'Aus500',
+            'Austr-PRJNA613958_nextseq550' => 'Aus550',
+            'Angola_miseq' => 'Ang',
+            'Botswana' => 'Bots',
+            'S_Afr-PRJNA636748' => 'SAfr',
+            'India-6000' => 'Ind6k',
+            'India-miseq' => 'Ind',
+            'illumina_miseq' => 'UK',
+            'nextseq_500' => 'UK500',
+            'nextseq_550' => 'UK550',
+            'illumina_hiseq_2500' => 'UK2500',
+            'PAK_iseq' => 'Pak',
+            'Slovakia_miseq' => 'Svk',
+            'LA-PRJNA815364' => 'LA',
+            'LA-PRJNA815364_nextseq500' => 'LA500',
+            'PRJNA622837-Broad_Inst' => 'Broad',
+            'Thailand_mix' => 'Thai',
+            'Russia682735' => 'Rus',
+        ];
+        $code = (string) $code;
+        if (isset($map[$code])) {
+            return $map[$code];
+        }
+        $short = preg_replace('/[^A-Za-z0-9]+/', '', $code);
+
+        return $short !== '' ? substr($short, 0, 8) : 'group';
+    }
+}
+
+if (!function_exists('nj_read_download_group_token')) {
+    /**
+     * @param list<string> $codes
+     */
+    function nj_read_download_group_token(array $codes)
+    {
+        $parts = [];
+        foreach ($codes as $code) {
+            $parts[] = nj_read_group_file_abbrev($code);
+        }
+        $groups = implode('_', $parts);
+        if ($groups === '') {
+            $groups = 'groups';
+        }
+        if (strlen($groups) > 80) {
+            $groups = count($codes) . 'groups';
+        }
+
+        return $groups;
+    }
+}
+
+if (!function_exists('nj_read_junction_download_name')) {
+    /**
+     * A second junction of the same size keeps its start in the name (2766_1883).
+     *
+     * @param list<string> $codes
+     */
+    function nj_read_junction_download_name($size, array $codes, $zip, $coordTag = '')
+    {
+        $groups = nj_read_download_group_token($codes);
+        if ($zip) {
+            return 'junctions_' . $groups . '.zip';
+        }
+        $name = (string) (int) $size;
+        $tag = (string) $coordTag;
+        if ($tag !== '') {
+            $name .= '_' . $tag;
+        }
+
+        return $name . '_' . $groups . '.csv';
+    }
+}
+
+if (!function_exists('nj_read_summary_download_name')) {
+    /**
+     * @param list<string> $codes
+     */
+    function nj_read_summary_download_name(array $codes)
+    {
+        return 'junction-summary_' . nj_read_download_group_token($codes) . '.csv';
+    }
+}
+
+if (!function_exists('nj_read_zip_bytes')) {
+    /**
+     * Stored (uncompressed) zip. Works without the zip extension.
+     *
+     * @param array<string,string> $namedBodies
+     */
+    function nj_read_zip_bytes(array $namedBodies)
+    {
+        $local = '';
+        $central = '';
+        $offset = 0;
+        $count = 0;
+        foreach ($namedBodies as $name => $body) {
+            $name = str_replace('\\', '/', (string) $name);
+            $body = (string) $body;
+            $crc = crc32($body);
+            $size = strlen($body);
+            $nameLen = strlen($name);
+            $localHeader = pack(
+                'VvvvvvVVVvv',
+                0x04034b50,
+                20,
+                0,
+                0,
+                0,
+                0,
+                $crc,
+                $size,
+                $size,
+                $nameLen,
+                0
+            ) . $name . $body;
+            $central .= pack(
+                'VvvvvvvVVVvvvvvVV',
+                0x02014b50,
+                20,
+                20,
+                0,
+                0,
+                0,
+                0,
+                $crc,
+                $size,
+                $size,
+                $nameLen,
+                0,
+                0,
+                0,
+                0,
+                0,
+                $offset
+            ) . $name;
+            $local .= $localHeader;
+            $offset += strlen($localHeader);
+            $count++;
+        }
+        $centralLen = strlen($central);
+
+        return $local . $central . pack(
+            'VvvvvVVv',
+            0x06054b50,
+            0,
+            0,
+            $count,
+            $count,
+            $centralLen,
+            $offset,
+            0
+        );
+    }
+}
+
 if (!function_exists('nj_read_grouped_count')) {
     /**
      * @param array<string,array<string,int>> $denoms
@@ -635,13 +1056,16 @@ if (!function_exists('nj_read_grouped_count')) {
      * @param list<string>|null $primers
      * @param array<string,mixed> $options
      */
-    function nj_read_grouped_count(array $denoms, array $buckets, $primers, array $options)
+    function nj_read_grouped_count(array $denoms, array $buckets, $primers, array $options, $block = null)
     {
         $opt = nj_read_coerce_merge($options);
         $parts = [];
         foreach ($denoms as $variant => $byPrimer) {
             $bucket = nj_read_variant_bucket($variant);
             if ($bucket === null || !in_array($bucket, $buckets, true)) {
+                continue;
+            }
+            if (($block === 'ba2' || $block === 'ba5') && !nj_read_pair_label_in_block($variant, $block)) {
                 continue;
             }
             if ($primers === null) {

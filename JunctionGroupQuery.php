@@ -33,12 +33,15 @@ $njVisibleGroups = [];
 $njGroupRows = [];
 $njGroupCodes = [];
 $njBy = 'pair';
+$njKeepSig = '';
+$njEarlyCounts = [];
 $njMergeDelta = false;
 $njChoices = [];
 $njSelectedCols = [];
 $njPick = null;
 $njOptions = nj_read_request_merge_options();
 $njSummary = [];
+$njCatalog = [];
 $njNgeneIds = [];
 $njKeep = [];
 $njAllDenoms = [];
@@ -111,7 +114,18 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             }
         }
     }
-    $njGroupCodes = nj_read_request_group_codes($njVisibleGroups);
+    $njVisibleCodes = [];
+    foreach ($njVisibleGroups as $vcfGroupRow) {
+        $njVisibleCodes[] = $vcfGroupRow['code'];
+    }
+    $njKeepSig = implode("\n", $njKeep);
+    $njPrevKeepSig = isset($_GET['NjKeepSig']) ? (string) $_GET['NjKeepSig'] : '';
+    $njGroupCodes = nj_read_filter_group_codes(
+        $njVisibleCodes,
+        nj_read_request_group_codes($njVisibleGroups),
+        $njKeepSig,
+        $njPrevKeepSig
+    );
     $njBy = nj_read_request_breakdown_by();
     $njMergeDelta = !empty($njOptions['merge_delta']);
     $njPick = nj_read_request_pick();
@@ -132,6 +146,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $njWantNgene = nj_read_request_ngene();
     $njAllNgene = $njWantNgene ? nj_read_ngene_group_ids($con, $njAllIds) : [];
     $njAllDenoms = nj_read_pair_denoms($con, $njAllIds, $njMinReads, $njAllNgene);
+    $njEarlyCounts = nj_read_early_counts($con);
     $njNgeneIds = $njWantNgene ? array_values(array_intersect($njAllNgene, $njGroupIds)) : [];
     $njDenoms = [];
     foreach ($njGroupIds as $njGroupId) {
@@ -286,10 +301,127 @@ function jq_csv_query($kind)
     return 'JunctionGroupQuery.php?' . http_build_query($query);
 }
 
-if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
+function jq_group_codes(array $groupRows)
+{
+    $codes = [];
+    foreach ($groupRows as $group) {
+        $codes[] = (string) $group['code'];
+    }
+
+    return $codes;
+}
+
+function jq_breakdown_csv(mysqli $con, array $groupRows, array $cols, $by, array $options, $size, $tag, $minReads, array $ngeneIds)
+{
+    $heads = ['Group'];
+    foreach ($cols as $csvKey) {
+        $head = nj_read_column_heads($csvKey, $by);
+        $heads[] = trim($head[0] . ' ' . $head[1]);
+    }
+    $lines = [nj_read_csv_line($heads)];
+    $ids = [];
+    foreach ($groupRows as $group) {
+        $ids[] = (int) $group['id'];
+    }
+    $raw = nj_read_breakdown_raw($con, $ids, $size, $tag, $minReads, $ngeneIds);
+    $cells = nj_read_fold_breakdown($raw, $cols, $by, $options);
+    foreach ($groupRows as $group) {
+        $line = [$group['label']];
+        foreach ($cols as $csvKey) {
+            $cellKey = (int) $group['id'] . "\t" . $csvKey;
+            $cell = isset($cells[$cellKey]) ? $cells[$cellKey] : ['n' => 0, 'd' => 0];
+            $line[] = nj_read_breakdown_display($cell['n'], $cell['d'], $options['min_samples'], !empty($options['show_below']));
+        }
+        $lines[] = nj_read_csv_line($line);
+    }
+
+    return "\xEF\xBB\xBF" . implode("\n", $lines) . "\n";
+}
+
+$njFilterMode = in_array($njBy, ['variant', 'primer', 'pair'], true) ? $njBy : 'pair';
+$njFilterTable = nj_read_filter_table(
+    isset($vcfGroups) ? $vcfGroups : [],
+    isset($njAllDenoms) ? $njAllDenoms : [],
+    isset($njEarlyCounts) ? $njEarlyCounts : [],
+    $njFilterMode,
+    $njOptions
+);
+
+if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con instanceof mysqli) {
     $csvKind = (string) $_GET['csv'];
+    if ($csvKind === 'filter') {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . nj_read_filter_download_name($njFilterTable['mode'], $njOptions['min_samples']) . '"');
+        echo "\xEF\xBB\xBF";
+        foreach ($njFilterTable['header_rows'] as $filterHeader) {
+            echo nj_read_csv_line($filterHeader) . "\n";
+        }
+        foreach ($njFilterTable['rows'] as $filterCsvRow) {
+            echo nj_read_csv_line($filterCsvRow) . "\n";
+        }
+        exit;
+    }
+    $csvCodes = jq_group_codes($njGroupRows);
+    $csvReady = $njSelectedCols && $njGroupRows;
+    if ($csvKind === 'junctions' && $csvReady) {
+        $catalogPicks = [];
+        foreach ($njCatalog as $catalogRow) {
+            $catalogPicks[nj_read_pick_value($catalogRow['nj_size'], $catalogRow['coord_tag'])] = true;
+        }
+        $chosen = [];
+        foreach (nj_read_request_junction_picks() as $junctionPick) {
+            $pickValue = nj_read_pick_value($junctionPick['nj_size'], $junctionPick['coord_tag']);
+            if (isset($catalogPicks[$pickValue])) {
+                $chosen[] = $junctionPick;
+            }
+        }
+        if ($chosen) {
+            $files = [];
+            foreach ($chosen as $junctionPick) {
+                $files[nj_read_junction_download_name($junctionPick['nj_size'], $csvCodes, false, $junctionPick['coord_tag'])] = jq_breakdown_csv(
+                    $con,
+                    $njGroupRows,
+                    $njSelectedCols,
+                    $njBy,
+                    $njOptions,
+                    $junctionPick['nj_size'],
+                    $junctionPick['coord_tag'],
+                    nj_read_request_min_reads(),
+                    $njNgeneIds
+                );
+            }
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . nj_read_junction_download_name(0, $csvCodes, true) . '"');
+            echo nj_read_zip_bytes($files);
+            exit;
+        }
+    }
+    $breakdownPick = $njPick;
+    $checkedForCsv = nj_read_request_junction_picks();
+    if (count($checkedForCsv) === 1) {
+        $breakdownPick = $checkedForCsv[0];
+    }
+    if ($csvKind === 'breakdown' && $breakdownPick !== null && $csvReady) {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . nj_read_junction_download_name($breakdownPick['nj_size'], $csvCodes, false, $breakdownPick['coord_tag']) . '"');
+        echo jq_breakdown_csv(
+            $con,
+            $njGroupRows,
+            $njSelectedCols,
+            $njBy,
+            $njOptions,
+            $breakdownPick['nj_size'],
+            $breakdownPick['coord_tag'],
+            nj_read_request_min_reads(),
+            $njNgeneIds
+        );
+        exit;
+    }
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="junction-' . preg_replace('/[^a-z]+/', '', $csvKind) . '.csv"');
+    $csvName = $csvKind === 'summary'
+        ? nj_read_summary_download_name($csvCodes)
+        : 'junction-' . preg_replace('/[^a-z]+/', '', $csvKind) . '.csv';
+    header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
         echo nj_read_csv_line(['NJ Size', 'start', 'end', 'Delta V3', 'Omi V3', 'Delta V4.1', 'Omi V4.1', 'Overall Average']) . "\n";
@@ -304,27 +436,6 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                 $csvRow['omi_v41'],
                 $csvRow['overall'],
             ]) . "\n";
-        }
-    } elseif ($csvKind === 'breakdown' && $njPick !== null && $njSelectedCols && $njGroupRows) {
-        $heads = ['Group'];
-        foreach ($njSelectedCols as $csvKey) {
-            $head = nj_read_column_heads($csvKey, $njBy);
-            $heads[] = trim($head[0] . ' ' . $head[1]);
-        }
-        echo nj_read_csv_line($heads) . "\n";
-        $csvIds = [];
-        foreach ($njGroupRows as $csvGroup) {
-            $csvIds[] = (int) $csvGroup['id'];
-        }
-        $csvRaw = nj_read_breakdown_raw($con, $csvIds, $njPick['nj_size'], $njPick['coord_tag'], nj_read_request_min_reads(), $njNgeneIds);
-        $csvCells = nj_read_fold_breakdown($csvRaw, $njSelectedCols, $njBy, $njOptions);
-        foreach ($njGroupRows as $csvGroup) {
-            $line = [$csvGroup['label']];
-            foreach ($njSelectedCols as $csvKey) {
-                $cell = isset($csvCells[(int) $csvGroup['id'] . "\t" . $csvKey]) ? $csvCells[(int) $csvGroup['id'] . "\t" . $csvKey] : ['n' => 0, 'd' => 0];
-                $line[] = nj_read_breakdown_display($cell['n'], $cell['d'], $njOptions['min_samples'], $njOptions['show_below']);
-            }
-            echo nj_read_csv_line($line) . "\n";
         }
     } else {
         echo nj_read_csv_line(['notice']) . "\n";
@@ -354,6 +465,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
         .jq-table-wrap { max-height: 420px; overflow: auto; margin-top: 8px; }
         .jq-table { font-size: 12px; }
         .jq-table th, .jq-table td { text-align: center; vertical-align: middle !important; white-space: nowrap; }
+        .jq-table.jq-pair th, .jq-table.jq-pair td { padding: 4px 3px; font-size: 11px; }
         .nj-datagrid { width: 100%; height: 500px; overflow: auto; margin-top: 8px; }
         .nj-datagrid table.sortable { border-collapse: collapse; width: 100%; table-layout: auto; }
         .nj-checks { max-height: 220px; overflow: auto; border: 1px solid #ccc; padding: 6px 8px; max-width: 720px; background: #fff; }
@@ -415,8 +527,18 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
         .jq-chart { height: 420px; width: 100%; margin: 12px 0 8px 0; }
         .jq-note { font-size: 13px; max-width: 980px; }
         tr.darkheader th { background: #333; color: #fff; position: sticky; top: 0; }
+        .jq-table-wrap thead {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        .jq-table-wrap tr.darkheader th {
+            position: static;
+            background: #333;
+        }
         .jq-rollup { font-weight: bold; background: #f7f7f7; }
         .jq-chart-controls label { font-weight: normal; margin-right: 16px; }
+        .jq-form .jq-submit { margin: 8px 0 12px 0; }
         .jq-color-key-title { font-weight: bold; margin-bottom: 6px; }
         .jq-color-key-list { list-style: none; padding: 0; margin: 0 0 16px 0; }
         .jq-color-key-list li { display: inline-block; margin: 0 12px 8px 0; font-size: 12px; }
@@ -456,11 +578,104 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
             <input type="hidden" name="left" value="<?php echo (int) $left; ?>" />
             <input type="hidden" name="right" value="<?php echo (int) $right; ?>" />
             <input type="hidden" name="query" value="1" />
+            <input type="hidden" name="NjColSet" value="1" />
+            <input type="hidden" name="NjBySig" value="<?php echo htmlspecialchars($njBy, ENT_QUOTES, 'UTF-8'); ?>" />
+            <input type="hidden" name="NjOptSig" value="<?php echo htmlspecialchars(nj_read_option_signature(), ENT_QUOTES, 'UTF-8'); ?>" />
+            <input type="hidden" name="NjKeepSig" value="<?php echo htmlspecialchars($njKeepSig, ENT_QUOTES, 'UTF-8'); ?>" />
 
             <div class="jq-filter-block">
                 <strong>Junction percents</strong>
                 <p class="text-muted" style="font-size:12px; margin:0 0 6px 0;">Check groups and columns, then click a junction. The summary table is the average for the checked groups. The table under a row is one group per line. <strong>-1</strong> means the sample count is under the minimum. <strong>0</strong> means the percent is actually 0. Allele frequency stays on the Mutations page.</p>
+                <?php
+                $njFilterMode = in_array($njBy, ['variant', 'primer', 'pair'], true) ? $njBy : 'pair';
+                $njFilterTitle = [
+                    'variant' => 'Filter Groups by Variant',
+                    'primer' => 'Filter groups by Primer',
+                    'pair' => 'Filter Groups by Variant-Primer Pairs',
+                ][$njFilterMode];
+                $njFilterNote = [
+                    'variant' => 'Check rows, then Submit, to limit the group list below. -1 is under the minimum sample count. 0 is a real zero. Early is a 2020–2021 list sample whose variant is “.” or blank. A group with no list has none. A “.” sample off that list is ignored. long LTG is Omi- plus both BA.2–5 and XBB. LTG is Omi- plus BA.2–5 or XBB, but not both. Omi- is Alpha or Delta only. Omi-,BA.1 is that group with BA.1 as well. long Omi+ is BA.2–5 and XBB with no Alpha or Delta. Omi+ is BA.2–5 or XBB, but not both, with no Alpha or Delta. BA.1 does not make a group LTG or Omi+.',
+                    'primer' => 'Check rows, then Submit, to limit the group list below. There is no Type column. Use this to find groups that use a primer, including Midnight, V5, and VarSkip. -1 is under the minimum sample count. 0 is a real zero.',
+                    'pair' => 'Check rows, then Submit, to limit the group list below. There is no Type column and no Alpha column. Alpha is V3 only. Each column stays so you can find a group for that variant and primer, including V5, Midnight, and VarSkip. BA.2 and BA.5 are separate until Merge BA.2–5 is checked. Hide BA.1 removes those columns. Merge Omicron replaces BA.2, BA.5, and XBB with one Omicron block. The checklist below chooses columns for the junction table and the download. -1 is under the minimum sample count. 0 is a real zero.',
+                ][$njFilterMode];
+                $njFilterCols = $njFilterTable['columns'];
+                ?>
+                <div class="jq-chart-controls" style="margin-top:8px;">
+                    <strong>Filter table</strong>
+                    <label><input type="radio" name="NjBy" value="variant"<?php echo $njBy === 'variant' ? ' checked' : ''; ?> /> Variants</label>
+                    <label><input type="radio" name="NjBy" value="primer"<?php echo $njBy === 'primer' ? ' checked' : ''; ?> /> Primers</label>
+                    <label><input type="radio" name="NjBy" value="pair"<?php echo $njBy === 'pair' ? ' checked' : ''; ?> /> Variant–primer pairs</label>
+                </div>
+                <div class="panel panel-default" style="margin-top:12px;">
+                    <div class="panel-heading jq-collapse-toggle">
+                        <a class="jq-panel-heading-link" data-toggle="collapse" href="#jqFilterGroups"><?php echo htmlspecialchars($njFilterTitle, ENT_QUOTES, 'UTF-8'); ?> <span class="caret"></span></a>
+                    </div>
+                    <div id="jqFilterGroups" class="panel-collapse collapse<?php echo $didQuery ? ' in' : ''; ?>">
+                        <div class="panel-body">
+                            <p class="text-muted" style="font-size:12px;"><?php echo htmlspecialchars($njFilterNote, ENT_QUOTES, 'UTF-8'); ?></p>
+                            <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('filter'), ENT_QUOTES, 'UTF-8'); ?>">Download this table (<?php echo htmlspecialchars(nj_read_filter_download_name($njFilterMode, $njOptions['min_samples']), ENT_QUOTES, 'UTF-8'); ?>)</a></p>
+                            <div class="jq-table-wrap">
+                                <table class="table table-bordered table-striped jq-table<?php echo $njFilterMode === 'pair' ? ' jq-pair' : ''; ?> sortable">
+                                    <thead>
+                                        <tr class="darkheader">
+                                            <th<?php echo $njFilterMode === 'pair' ? ' rowspan="2"' : ''; ?>>Select</th>
+                                            <th class="jq-group"<?php echo $njFilterMode === 'pair' ? ' rowspan="2"' : ''; ?>>Group</th>
+                                            <?php if ($njFilterMode === 'variant') : ?>
+                                                <th>Type</th>
+                                                <th>Early</th>
+                                            <?php endif; ?>
+                                            <?php if ($njFilterMode === 'pair') : ?>
+                                                <?php
+                                                $pairSpans = [];
+                                                foreach ($njFilterCols as $filterCol) {
+                                                    $spanTop = $filterCol['top'];
+                                                    if ($pairSpans && $pairSpans[count($pairSpans) - 1]['top'] === $spanTop) {
+                                                        $pairSpans[count($pairSpans) - 1]['n']++;
+                                                    } else {
+                                                        $pairSpans[] = ['top' => $spanTop, 'n' => 1];
+                                                    }
+                                                }
+                                                foreach ($pairSpans as $pairSpan) :
+                                                    ?>
+                                                    <th colspan="<?php echo (int) $pairSpan['n']; ?>"><?php echo htmlspecialchars($pairSpan['top'], ENT_QUOTES, 'UTF-8'); ?></th>
+                                                <?php endforeach; ?>
+                                            <?php else : ?>
+                                                <?php foreach ($njFilterCols as $filterCol) : ?>
+                                                    <?php $filterHead = $filterCol['top'] !== '' ? $filterCol['top'] . ' ' . $filterCol['sub'] : $filterCol['sub']; ?>
+                                                    <th><?php echo htmlspecialchars($filterHead, ENT_QUOTES, 'UTF-8'); ?></th>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </tr>
+                                        <?php if ($njFilterMode === 'pair') : ?>
+                                            <tr class="darkheader">
+                                                <?php foreach ($njFilterCols as $filterCol) : ?>
+                                                    <th><?php echo htmlspecialchars($filterCol['sub'], ENT_QUOTES, 'UTF-8'); ?></th>
+                                                <?php endforeach; ?>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </thead>
+                                    <tbody>
+                                    <?php foreach ($vcfGroups as $filterIndex => $filterGroup) : ?>
+                                        <?php $filterLine = $njFilterTable['rows'][$filterIndex]; ?>
+                                        <tr>
+                                            <td><input type="checkbox" name="NjKeep[]" value="<?php echo htmlspecialchars($filterGroup['code'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo in_array($filterGroup['code'], $njKeep, true) ? ' checked' : ''; ?> /></td>
+                                            <?php foreach ($filterLine as $filterCellIndex => $filterCell) : ?>
+                                                <td<?php echo $filterCellIndex === 0 ? ' class="jq-group"' : ''; ?>><?php echo htmlspecialchars((string) $filterCell, ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php if ($njFilterMode !== 'variant') : ?>
+                                <p class="text-muted" style="font-size:12px;"><?php echo htmlspecialchars(nj_read_primer_caption(), ENT_QUOTES, 'UTF-8'); ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary jq-submit">Submit</button>
                 <strong>Groups</strong>
+                <label><input type="checkbox" class="nj-select-all" data-nj-target="NjGroup" /> Select all</label>
                 <div class="nj-checks" id="NjGroup">
                     <?php foreach ($njVisibleGroups as $vcfGroupRow) : ?>
                         <label>
@@ -469,7 +684,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <p class="text-muted" style="font-size:12px;">Click Query after changing the groups so the column list matches them.</p>
+                <p class="text-muted" style="font-size:12px;">Checking rows in the filter table and submitting selects every group in this list. Select all checks or clears it. Submit applies a change here too.</p>
                 <?php foreach ($njGroupRows as $njGroupRow) : ?>
                     <?php if (nj_read_many_project_file($njGroupRow['code']) !== null) : ?>
                         <p style="margin-top:6px;"><a href="VcfGroupProjects.php?group=<?php echo rawurlencode($njGroupRow['code']); ?>">View the project accessions in <?php echo htmlspecialchars($njGroupRow['label'], ENT_QUOTES, 'UTF-8'); ?></a></p>
@@ -499,78 +714,18 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                         Filter for samples containing N gene sgRNA
                     </label>
                 </div>
-                <?php
-                $njPrimerCols = [
-                    'V3' => 'COVID-ARTIC-V3',
-                    'V4.1' => 'COVID-ARTIC-V4.1',
-                    'V5.0' => 'COVID-ARTIC-V5.0-5.3.2_400',
-                    'Mid' => 'COVID-MIDNIGHT-1200',
-                    'Vsk' => 'COVID-VARSKIP-V1a-2b',
-                ];
-                $njCountBuckets = ['alpha', 'delta', 'ba1', 'ba', 'xbb', 'omicron_other', 'other'];
-                ?>
-                <div class="panel panel-default" style="margin-top:12px;">
-                    <div class="panel-heading jq-collapse-toggle">
-                        <a class="jq-panel-heading-link" data-toggle="collapse" href="#jqFilterGroups">Filter groups <span class="caret"></span></a>
-                    </div>
-                    <div id="jqFilterGroups" class="panel-collapse collapse">
-                        <div class="panel-body">
-                            <p class="text-muted" style="font-size:12px;">Check rows to limit the group list above. Counts under the minimum are -1. A real zero stays 0. Type is LTG, Omni−, or Omni+. BA.1 does not count as Omicron for Type.</p>
-                            <div class="jq-table-wrap">
-                                <table class="table table-bordered table-striped jq-table sortable">
-                                    <thead>
-                                        <tr class="darkheader">
-                                            <th>Select</th><th class="jq-group">Group</th><th>Type</th>
-                                            <th>Alpha</th><th>Delta</th><th>BA.2–5</th><th>XBB</th>
-                                            <?php foreach ($njPrimerCols as $abbrev => $full) : ?>
-                                                <th><?php echo htmlspecialchars($abbrev, ENT_QUOTES, 'UTF-8'); ?></th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    <?php foreach ($vcfGroups as $filterGroup) : ?>
-                                        <?php
-                                        $filterDenoms = isset($njAllDenoms[(int) $filterGroup['id']]) ? $njAllDenoms[(int) $filterGroup['id']] : [];
-                                        $filterType = nj_read_group_type(nj_read_variant_totals($filterDenoms), $njOptions['min_samples']);
-                                        ?>
-                                        <tr>
-                                            <td><input type="checkbox" name="NjKeep[]" value="<?php echo htmlspecialchars($filterGroup['code'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo in_array($filterGroup['code'], $njKeep, true) ? ' checked' : ''; ?> /></td>
-                                            <td class="jq-group"><?php echo htmlspecialchars($filterGroup['label'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars($filterType, ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars(nj_read_grouped_count($filterDenoms, ['alpha'], null, $njOptions), ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars(nj_read_grouped_count($filterDenoms, ['delta'], null, $njOptions), ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars(nj_read_grouped_count($filterDenoms, ['ba'], null, $njOptions), ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars(nj_read_grouped_count($filterDenoms, ['xbb'], null, $njOptions), ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <?php foreach ($njPrimerCols as $abbrev => $full) : ?>
-                                                <td><?php echo htmlspecialchars(nj_read_grouped_count($filterDenoms, $njCountBuckets, [$full], $njOptions), ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p class="text-muted" style="font-size:12px;"><?php echo htmlspecialchars(nj_read_primer_caption(), ENT_QUOTES, 'UTF-8'); ?></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="jq-chart-controls" style="margin-top:8px;">
-                    <strong>Columns</strong>
-                    <label><input type="radio" name="NjBy" value="variant"<?php echo $njBy === 'variant' ? ' checked' : ''; ?> onchange="this.form.submit()" /> Variants</label>
-                    <label><input type="radio" name="NjBy" value="primer"<?php echo $njBy === 'primer' ? ' checked' : ''; ?> onchange="this.form.submit()" /> Primers</label>
-                    <label><input type="radio" name="NjBy" value="pair"<?php echo $njBy === 'pair' ? ' checked' : ''; ?> onchange="this.form.submit()" /> Variant–primer pairs</label>
-                </div>
                 <div class="checkbox">
                     <label>
                         <input type="hidden" name="Major" value="0" />
-                        <input id="Major" name="Major" type="checkbox" value="1"<?php echo !empty($njOptions['major_only']) ? ' checked' : ''; ?> onchange="this.form.submit()" />
+                        <input id="Major" name="Major" type="checkbox" value="1"<?php echo !empty($njOptions['major_only']) ? ' checked' : ''; ?> />
                         Show only major variants
                     </label>
-                    <p class="text-muted" style="font-size:12px; margin:0;">Alpha, Delta, and Omicron. On by default.</p>
+                    <p class="text-muted" style="font-size:12px; margin:0;">Alpha, Delta, and Omicron. On by default. An extra mutation, such as B.1.1.7-like+E484K, stays off this list.</p>
                 </div>
                 <div class="checkbox">
                     <label>
                         <input type="hidden" name="MergeDelta" value="0" />
-                        <input id="MergeDelta" name="MergeDelta" type="checkbox" value="1"<?php echo !empty($njOptions['merge_delta']) ? ' checked' : ''; ?> onchange="this.form.submit()" />
+                        <input id="MergeDelta" name="MergeDelta" type="checkbox" value="1"<?php echo !empty($njOptions['merge_delta']) ? ' checked' : ''; ?> />
                         Merge Delta
                     </label>
                     <p class="text-muted" style="font-size:12px; margin:0;">Delta subtypes become one Delta. Other variants stay on the list.</p>
@@ -578,7 +733,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                 <div class="checkbox">
                     <label>
                         <input type="hidden" name="MergeOmicron" value="0" />
-                        <input id="MergeOmicron" name="MergeOmicron" type="checkbox" value="1"<?php echo !empty($njOptions['merge_omicron']) ? ' checked' : ''; ?> onchange="this.form.submit()" />
+                        <input id="MergeOmicron" name="MergeOmicron" type="checkbox" value="1"<?php echo !empty($njOptions['merge_omicron']) ? ' checked' : ''; ?> />
                         Merge Omicron
                     </label>
                     <p class="text-muted" style="font-size:12px; margin:0;">All Omicrons except BA.1. This cannot be combined with the two merges below.</p>
@@ -587,24 +742,25 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                     <label>
                         <input type="hidden" name="MergeBa" value="0" />
                         <input id="MergeBa" name="MergeBa" type="checkbox" value="1"<?php echo !empty($njOptions['merge_ba']) ? ' checked' : ''; ?> />
-                        Merge Omicron BA
+                        Merge BA.2–5
                     </label>
                     <label style="margin-left:12px;">
                         <input type="hidden" name="MergeXbb" value="0" />
                         <input id="MergeXbb" name="MergeXbb" type="checkbox" value="1"<?php echo !empty($njOptions['merge_xbb']) ? ' checked' : ''; ?> />
                         Merge XBB
                     </label>
-                    <p class="text-muted" style="font-size:12px; margin:0;">BA merges BA.2 and later, not BA.1. XBB merges XBB only. BA.1 stays separate because it is known to be contaminated with Delta.</p>
+                    <p class="text-muted" style="font-size:12px; margin:0;">BA.2–5 merges BA.2, BA.3, BA.4, and BA.5. BA.3 is rare. XBB merges XBB only. BA.1 stays separate because it is known to be contaminated with Delta.</p>
                 </div>
                 <div class="checkbox">
                     <label>
                         <input type="hidden" name="HideBa1" value="0" />
-                        <input id="HideBa1" name="HideBa1" type="checkbox" value="1"<?php echo !empty($njOptions['hide_ba1']) ? ' checked' : ''; ?> onchange="this.form.submit()" />
+                        <input id="HideBa1" name="HideBa1" type="checkbox" value="1"<?php echo !empty($njOptions['hide_ba1']) ? ' checked' : ''; ?> />
                         Hide BA.1
                     </label>
                 </div>
                 <strong><?php echo $njBy === 'primer' ? 'Primers' : ($njBy === 'variant' ? 'Variants' : 'Variant–primer pairs'); ?></strong>
-                <div class="nj-checks">
+                <label><input type="checkbox" class="nj-select-all" data-nj-target="NjCol" /> Select all</label>
+                <div class="nj-checks" id="NjCol">
                     <?php foreach ($njChoices as $choice) : ?>
                         <?php $choiceHead = nj_read_column_heads($choice['key'], $njBy); ?>
                         <label>
@@ -613,16 +769,13 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '') {
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <p class="text-muted" style="font-size:12px;">No-variant-call, no-primer-call, Unassigned, and Probable are left out. <?php echo htmlspecialchars(nj_read_primer_caption(), ENT_QUOTES, 'UTF-8'); ?></p>
+                <p class="text-muted" style="font-size:12px;">These choices set the junction table and the download. They do not remove columns from the filter table. No-variant-call, no-primer-call, Unassigned, and Probable are left out. <?php echo htmlspecialchars(nj_read_primer_caption(), ENT_QUOTES, 'UTF-8'); ?></p>
+                <button type="submit" class="btn btn-primary jq-submit">Submit</button>
                 <input type="hidden" name="NjPick" value="<?php echo $njPick === null ? '' : htmlspecialchars(nj_read_pick_value($njPick['nj_size'], $njPick['coord_tag']), ENT_QUOTES, 'UTF-8'); ?>" />
             </div>
             <div class="jq-filter-block">
                 <strong>Click a junction</strong>
-                <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('summary'), ENT_QUOTES, 'UTF-8'); ?>">Download the summary table (CSV)</a>
-                    <?php if ($njPick !== null) : ?>
-                        · <a href="<?php echo htmlspecialchars(jq_csv_query('breakdown'), ENT_QUOTES, 'UTF-8'); ?>">Download the selected junction (CSV)</a>
-                    <?php endif; ?>
-                </p>
+                <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('summary'), ENT_QUOTES, 'UTF-8'); ?>">Download the summary table (<?php echo htmlspecialchars(nj_read_summary_download_name(jq_group_codes($njGroupRows)), ENT_QUOTES, 'UTF-8'); ?>)</a></p>
                 <?php include __DIR__ . '/MutationsNj.php'; ?>
             </div>
             <div class="jq-filter-block" data-jq-all="primer">
@@ -855,18 +1008,51 @@ if (window.JunctionQueryCharts) {
     $('.jq-filter-block[data-jq-all]').each(function () {
         bindAll($(this));
     });
+    $('button.nj-show').on('click', function () {
+        $(this).closest('tr').find('input[name="NjJunction[]"]').prop('checked', true);
+    });
     $('.nj-pick-row').on('click', function (ev) {
-        if ($(ev.target).closest('button').length) {
+        if ($(ev.target).closest('button, input').length) {
             return;
         }
+        $(this).find('input[name="NjJunction[]"]').prop('checked', true);
         var btn = $(this).find('button.nj-show').get(0);
         if (btn) {
             btn.click();
         }
     });
+    $('#NjJunction').on('change', 'input[name="NjJunction[]"]', function () {
+        submitFilterForm();
+    });
+    $('.nj-select-all[data-nj-target="NjJunction"]').on('change', function () {
+        var breakdown = document.getElementById('njBreakdown');
+        var checked = $('#NjJunction input[name="NjJunction[]"]:checked').length;
+        if (breakdown && checked !== 1) {
+            breakdown.style.display = 'none';
+        }
+    });
+    var form = document.querySelector('form.jq-form');
+    if (form) {
+        form.addEventListener('submit', function (ev) {
+            var jump = ev.submitter && ev.submitter.classList && ev.submitter.classList.contains('nj-show');
+            try {
+                sessionStorage.setItem('jqScrollY', jump ? 'breakdown' : String(window.scrollY || window.pageYOffset || 0));
+            } catch (err) {}
+        });
+    }
     var breakdown = document.getElementById('njBreakdown');
-    if (breakdown) {
+    var savedScroll = null;
+    try {
+        savedScroll = sessionStorage.getItem('jqScrollY');
+        sessionStorage.removeItem('jqScrollY');
+    } catch (err) {}
+    if (savedScroll === 'breakdown' && breakdown) {
         breakdown.scrollIntoView({block: 'start'});
+    } else if (savedScroll !== null && savedScroll !== '') {
+        var scrollY = parseInt(savedScroll, 10);
+        if (!isNaN(scrollY)) {
+            window.scrollTo(0, scrollY);
+        }
     }
     function syncOmicronMerges() {
         var broad = $('#MergeOmicron').prop('checked');
@@ -875,8 +1061,34 @@ if (window.JunctionQueryCharts) {
             $('#MergeBa, #MergeXbb').prop('checked', false);
         }
     }
-    $('#MergeOmicron').on('change', syncOmicronMerges);
     syncOmicronMerges();
+    function submitFilterForm() {
+        if (!form) {
+            return;
+        }
+        if (form.requestSubmit) {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    }
+    $('input[name="NjBy"], #Major, #MergeDelta, #MergeBa, #MergeXbb, #HideBa1').on('change', submitFilterForm);
+    $('#MergeOmicron').on('change', function () {
+        syncOmicronMerges();
+        submitFilterForm();
+    });
+    $('.nj-select-all').each(function () {
+        var $all = $(this);
+        var $ones = $('#' + $all.attr('data-nj-target')).find('input[type="checkbox"]');
+        function syncAll() {
+            $all.prop('checked', $ones.length > 0 && $ones.filter(':checked').length === $ones.length);
+        }
+        $all.on('change', function () {
+            $ones.prop('checked', this.checked);
+        });
+        $ones.on('change', syncAll);
+        syncAll();
+    });
 })(jQuery);
 </script>
 </body>

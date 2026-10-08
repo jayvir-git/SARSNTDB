@@ -86,9 +86,22 @@ $summaryByPick = [];
 foreach ($njSummary as $summaryRow) {
     $summaryByPick[nj_read_pick_value($summaryRow['nj_size'], $summaryRow['coord_tag'])] = $summaryRow;
 }
+$njJunctionOn = [];
+$checkedJunctions = nj_read_request_junction_picks();
+foreach ($checkedJunctions as $junctionPick) {
+    $njJunctionOn[nj_read_pick_value($junctionPick['nj_size'], $junctionPick['coord_tag'])] = true;
+}
+$soleJunction = count($checkedJunctions) === 1 ? $checkedJunctions[0] : null;
+$njFileCodes = [];
+foreach ($njGroupRows as $njFileGroup) {
+    $njFileCodes[] = (string) $njFileGroup['code'];
+}
 echo '<p class="text-muted" style="font-size:12px; margin:8px 0 0 0;">Averages for the selected groups. Delta and Omicron are merged. BA.1 is left out of Omicron. ' . htmlspecialchars(nj_read_primer_caption(), ENT_QUOTES, 'UTF-8') . ' <strong>-1</strong> means the count is under the minimum number of samples. <strong>0</strong> means the percent is actually 0. Click a column heading to sort.</p>';
-echo '<div class="nj-datagrid"><table class="sortable"><thead><tr class="dark">';
-echo '<th>NJ size</th><th>Start</th><th>End</th>';
+echo '<p style="margin:6px 0;"><label><input type="checkbox" class="nj-select-all" data-nj-target="NjJunction" /> Select all</label> ';
+echo '<button type="submit" class="btn btn-default btn-sm" name="csv" value="junctions">Download the checked junctions</button>';
+echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names. Three groups at size 894 download as <code>894_Arg_Port550_NJ.csv</code>. When another junction has the same size, its start is added, as in <code>2766_1883_NJ.csv</code>. The table below is shown only when one junction is checked.</span></p>';
+echo '<div class="nj-datagrid" id="NjJunction"><table class="sortable"><thead><tr class="dark">';
+echo '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
 echo '<th>Delta V3</th><th>Omi V3</th><th>Delta V4.1</th><th>Omi V4.1</th><th>Overall</th>';
 echo '</tr></thead><tbody>';
 $color1 = 'background-color:White';
@@ -99,10 +112,12 @@ foreach ($catalog as $row) {
     $end = $row['nj_end'] === null ? '' : (string) $row['nj_end'];
     $pickValue = nj_read_pick_value($row['nj_size'], $row['coord_tag']);
     $summaryRow = isset($summaryByPick[$pickValue]) ? $summaryByPick[$pickValue] : null;
-    $current = $njPick !== null && $pickValue === nj_read_pick_value($njPick['nj_size'], $njPick['coord_tag']);
+    $current = $soleJunction !== null && $pickValue === nj_read_pick_value($soleJunction['nj_size'], $soleJunction['coord_tag']);
     $rowStyle = ($prevColor === $color1) ? $color2 : $color1;
     $prevColor = $rowStyle;
+    $junctionChecked = isset($njJunctionOn[$pickValue]) ? ' checked' : '';
     echo '<tr class="nj-pick-row' . ($current ? ' nj-pick-current' : '') . '" style="' . $rowStyle . '">';
+    echo '<td><input type="checkbox" name="NjJunction[]" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '"' . $junctionChecked . ' /></td>';
     echo '<td><button type="submit" class="nj-show" name="NjPick" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '">';
     echo (int) $row['nj_size'];
     echo '</button></td>';
@@ -116,12 +131,26 @@ foreach ($catalog as $row) {
 }
 echo '</tbody></table></div>';
 
-if ($njPick === null) {
+if ($soleJunction === null) {
     return;
+}
+$njPick = $soleJunction;
+$pickRow = null;
+foreach ($catalog as $row) {
+    if ((int) $row['nj_size'] === $njPick['nj_size'] && (string) $row['coord_tag'] === $njPick['coord_tag']) {
+        $pickRow = $row;
+        break;
+    }
 }
 
 echo '<div id="njBreakdown">';
-echo '<h4 class="search-header" style="margin-top:16px;">';
+$njBreakdownName = nj_read_junction_download_name($njPick['nj_size'], $njFileCodes, false, $njPick['coord_tag']);
+$njBreakdownQuery = $_GET;
+$njBreakdownQuery['csv'] = 'breakdown';
+$njBreakdownQuery['query'] = '1';
+$njBreakdownQuery['NjPick'] = nj_read_pick_value($njPick['nj_size'], $njPick['coord_tag']);
+echo '<p style="margin:12px 0 0 0;"><a href="' . htmlspecialchars('JunctionGroupQuery.php?' . http_build_query($njBreakdownQuery), ENT_QUOTES, 'UTF-8') . '">Download this junction (' . htmlspecialchars($njBreakdownName, ENT_QUOTES, 'UTF-8') . ')</a></p>';
+echo '<h4 class="search-header" style="margin-top:8px;">';
 if ($pickRow === null) {
     echo 'That junction is not in the coordinate table.';
     echo '</h4></div>';

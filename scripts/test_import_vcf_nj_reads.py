@@ -36,6 +36,10 @@ expect(
 expect(parse_coord_name("India-6000_all_28190_coord.csv") == ("India-6000", 28190, ""), "sheet hyphen also maps")
 expect(parse_coord_name("Ang_miseq_50_11565_coord.csv") is None, "extra start coordinate skipped")
 expect(parse_coord_name("Ang_miseq_894_coord1.csv") is None, "coord1 skipped")
+expect(parse_coord_name("PRJNA656534-NM_894_coord.csv") == ("NM", 894, ""), "New Mexico simple file")
+expect(parse_coord_name("PRJNA625551-VA_894_coord.csv") == ("VA", 894, ""), "Virginia simple file")
+expect(parse_coord_name("Austr_nextseq500_894_coord.csv") == ("Austr-PRJNA613958_nextseq500", 894, ""), "Australia 500 simple file")
+expect(parse_coord_name("Austr_nextseq550_894_coord.csv") == ("Austr-PRJNA613958_nextseq550", 894, ""), "Australia 550 simple file")
 expect(parse_coord_name("LA_all_102_coord.csv") == ("LA-PRJNA815364", 102, ""), "LA simple file")
 import import_vcf_nj_reads as njimp
 njimp.ALLOWED = {(2766, ""), (2766, "1883"), (118, "29686"), (118, "29687")}

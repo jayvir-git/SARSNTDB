@@ -56,6 +56,40 @@
           padding: 0 32px 8px 32px;
           max-width: 1100px;
         }
+        #snvPairResult {
+          padding: 0 32px 16px 32px;
+        }
+        #snvPairResult .datagrid {
+          width: 100%;
+          max-height: 520px;
+          overflow: auto;
+          background: #fff;
+        }
+        #snvPairResult table.sortable {
+          border-collapse: collapse;
+          width: 100%;
+        }
+        #snvPairResult table.sortable th,
+        #snvPairResult table.sortable td {
+          padding: 6px 8px;
+          border-right: 1px solid #bbb;
+        }
+        #snvPairResult th {
+          position: sticky;
+          top: 0;
+          background: #333;
+          color: #fff;
+          z-index: 1;
+        }
+        #snvPairResult tr.snv-primer-row {
+          cursor: pointer;
+        }
+        #snvPairResult tr.snv-primer-row:hover td {
+          outline: 1px solid #5cb85c;
+        }
+        #snvPairMergeWrap {
+          margin-top: 6px;
+        }
         .search-header 
         {
           padding-left: 10px;
@@ -251,7 +285,38 @@
             <div class="col-md-3">
               <label for="MinAf">Min allele frequency</label>
               <input id="MinAf" type="number" class="form-control" min="0" max="1" step="0.01" value="0.8" title="A sample counts only if its VCF AF is at least this value"/>
-              <small class="text-muted field-hint">Default 0.8; ignored for Original</small>
+              <small class="text-muted field-hint">Default 0.8. The pair comparison uses this value.</small>
+            </div>
+          </div>
+          <div class="row mutation-search-row" id="snvPairRow">
+            <div class="col-md-12">
+              <p class="mutation-search-label">Compare variant–primer pairs</p>
+              <p class="text-muted" style="font-size:12px;margin:0 0 8px 0;">SNVs in one group, two pairs. Each percent is the share of samples in that pair. A sample counts when its allele frequency is at least the minimum above. Rel. % Diff is the absolute difference divided by the average of the two percents. Defaults stay 0.8, 30 samples, and 1% in either pair. Merge Delta keeps a subtype only when that subtype meets the minimum.</p>
+            </div>
+            <div class="col-md-3">
+              <label for="SnvPair1">Pair 1</label>
+              <select class="form-control" id="SnvPair1"></select>
+              <small class="text-muted field-hint">Count is samples in the pair</small>
+            </div>
+            <div class="col-md-3">
+              <label for="SnvPair2">Pair 2</label>
+              <select class="form-control" id="SnvPair2"></select>
+              <div id="snvPairMergeWrap">
+                <label style="font-weight:normal;"><input type="checkbox" id="SnvPairMergeDelta" checked="checked" /> Merge Delta</label>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label for="SnvPairMinSamples">Min samples</label>
+              <input id="SnvPairMinSamples" type="number" class="form-control" min="0" step="1" value="30" />
+              <small class="text-muted field-hint">Default 30</small>
+            </div>
+            <div class="col-md-2">
+              <label for="SnvPairMinPercent">Min %</label>
+              <input id="SnvPairMinPercent" type="number" class="form-control" min="0" max="100" step="0.01" value="1" />
+              <small class="text-muted field-hint">In either pair</small>
+            </div>
+            <div class="col-md-2 search-field-actions">
+              <button type="button" class="btn btn-success" id="snvPairCompareBtn">Compare</button>
             </div>
           </div>
           <?php endif; ?>
@@ -334,6 +399,7 @@
       </div>
       </div>
     </div>
+    <div id="snvPairResult"></div>
     <i id="emptyText">Apply filters and hit submit to start seeing results.</i>
     <div id="mutationsData" style="display:none;"> 
 
@@ -465,6 +531,143 @@
 
     function vcfQuerySuffix() {
       return "&Group="+encodeURIComponent(selectedVcfGroup())+"&MinAf="+encodeURIComponent(selectedMinAf());
+    }
+
+    var snvPairChoiceGen = 0;
+
+    function snvPairField(id) {
+      return document.getElementById(id);
+    }
+
+    function snvPairParams() {
+      var minEl = snvPairField("SnvPairMinSamples");
+      var mergeEl = snvPairField("SnvPairMergeDelta");
+      return "Group=" + encodeURIComponent(selectedVcfGroup())
+        + "&MinSamples=" + encodeURIComponent(minEl ? minEl.value : "30")
+        + "&MergeDelta=" + (mergeEl && mergeEl.checked ? "1" : "0");
+    }
+
+    function setSnvPairEnabled(on) {
+      ["SnvPair1", "SnvPair2", "SnvPairMinSamples", "SnvPairMinPercent", "SnvPairMergeDelta", "snvPairCompareBtn"].forEach(function (id) {
+        var el = snvPairField(id);
+        if (el) {
+          el.disabled = !on;
+        }
+      });
+    }
+
+    function fillSnvPairSelect(select, choices, preferred) {
+      if (!select) {
+        return;
+      }
+      var current = select.value;
+      select.innerHTML = "";
+      choices.forEach(function (choice) {
+        var opt = document.createElement("option");
+        opt.value = choice.key;
+        var count = choice.ready ? choice.n : choice.raw;
+        opt.textContent = choice.label + " (" + count + (choice.ready ? "" : ", under minimum") + ")";
+        select.appendChild(opt);
+      });
+      var keys = choices.map(function (choice) { return choice.key; });
+      if (current && keys.indexOf(current) !== -1) {
+        select.value = current;
+      } else if (preferred && keys.indexOf(preferred) !== -1) {
+        select.value = preferred;
+      }
+    }
+
+    function loadSnvPairChoices() {
+      var result = snvPairField("snvPairResult");
+      if (!snvPairField("snvPairRow")) {
+        return;
+      }
+      var gen = ++snvPairChoiceGen;
+      if (result) {
+        result.innerHTML = "";
+      }
+      if (selectedVcfGroup() === "original") {
+        setSnvPairEnabled(false);
+        if (result) {
+          result.innerHTML = "<p class=\"text-muted\">Pick a VCF group. Original has no variant or primer calls.</p>";
+        }
+        return;
+      }
+      setSnvPairEnabled(false);
+      var req = new XMLHttpRequest();
+      req.open("GET", "SnvPairCompare.php?what=choices&" + snvPairParams());
+      req.onload = function () {
+        if (gen !== snvPairChoiceGen) {
+          return;
+        }
+        setSnvPairEnabled(true);
+        var data = {};
+        try {
+          data = JSON.parse(req.responseText);
+        } catch (e) {
+          data = {};
+        }
+        var choices = data.choices || [];
+        fillSnvPairSelect(snvPairField("SnvPair1"), choices, data.pair1);
+        fillSnvPairSelect(snvPairField("SnvPair2"), choices, data.pair2);
+        if (!choices.length && result) {
+          result.innerHTML = "<p class=\"text-muted\">This group has no variant–primer pairs.</p>";
+        }
+      };
+      req.onerror = function () {
+        if (gen !== snvPairChoiceGen) {
+          return;
+        }
+        setSnvPairEnabled(true);
+      };
+      req.send();
+    }
+
+    function runSnvPairCompare() {
+      var result = snvPairField("snvPairResult");
+      if (!result || selectedVcfGroup() === "original") {
+        return;
+      }
+      var pair1 = snvPairField("SnvPair1");
+      var pair2 = snvPairField("SnvPair2");
+      var minPct = snvPairField("SnvPairMinPercent");
+      result.innerHTML = "<p class=\"text-muted\">Comparing…</p>";
+      var req = new XMLHttpRequest();
+      req.open("GET", "SnvPairCompare.php?what=table&" + snvPairParams()
+        + "&MinAf=" + encodeURIComponent(selectedMinAf())
+        + "&MinPercent=" + encodeURIComponent(minPct ? minPct.value : "1")
+        + "&Pair1=" + encodeURIComponent(pair1 ? pair1.value : "")
+        + "&Pair2=" + encodeURIComponent(pair2 ? pair2.value : ""));
+      req.onload = function () {
+        result.innerHTML = req.status >= 200 && req.status < 300
+          ? req.responseText
+          : "<p class=\"text-muted\">The comparison did not load.</p>";
+      };
+      req.onerror = function () {
+        result.innerHTML = "<p class=\"text-muted\">The comparison did not load.</p>";
+      };
+      req.send();
+    }
+
+    function openSnvPrimerFromEvent(e) {
+      var t = e.target;
+      if (!t || !t.closest) {
+        return;
+      }
+      var row = t.closest("tr.snv-primer-row");
+      if (!row) {
+        return;
+      }
+      var coord = row.getAttribute("data-coord");
+      if (!coord) {
+        return;
+      }
+      var url = "SnvPrimerView.php?coord=" + encodeURIComponent(coord);
+      var ref = row.getAttribute("data-ref");
+      var alt = row.getAttribute("data-alt");
+      if (ref) { url += "&ref=" + encodeURIComponent(ref); }
+      if (alt) { url += "&alt=" + encodeURIComponent(alt); }
+      window.open(url, "_blank");
     }
 
     function escapeHtmlText(value) {
@@ -824,9 +1027,27 @@
           groupEl.addEventListener("change", function () {
             syncManyProjectsLink();
             refreshCurrentMutationsSearch();
+            loadSnvPairChoices();
           });
         }
+        var snvPairMinEl = document.getElementById("SnvPairMinSamples");
+        if (snvPairMinEl) {
+          snvPairMinEl.addEventListener("change", loadSnvPairChoices);
+        }
+        var snvPairMergeEl = document.getElementById("SnvPairMergeDelta");
+        if (snvPairMergeEl) {
+          snvPairMergeEl.addEventListener("change", loadSnvPairChoices);
+        }
+        var snvPairBtn = document.getElementById("snvPairCompareBtn");
+        if (snvPairBtn) {
+          snvPairBtn.addEventListener("click", runSnvPairCompare);
+        }
+        var snvPairResultEl = document.getElementById("snvPairResult");
+        if (snvPairResultEl) {
+          snvPairResultEl.addEventListener("click", openSnvPrimerFromEvent);
+        }
         syncManyProjectsLink();
+        loadSnvPairChoices();
 
         submitCoordinateSearch();
 
