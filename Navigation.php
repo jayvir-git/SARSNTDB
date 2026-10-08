@@ -73,7 +73,7 @@
                           <li><a href="MutationsSearch.php"> Mutations </a></li>
                           <li><a href="PangoMarkers.php"> Pango markers </a></li>
                           <li><a href="motifvisualizer.php"> Repeats </a></li>
-                          <li><a href="TwoSegmentStructures.php"> 2-segment (sgmRNA) </a></li>
+                          <li><a href="TwoSegmentStructures.php"> 2-segment (sgRNA) </a></li>
                           <li><a href="JunctionGroupQuery.php"> Junction groups </a></li>
                           <li><a href="RepeatCsvTwoSegment.php"> CSV repeats vs 2-segment </a></li>
                         </ul>

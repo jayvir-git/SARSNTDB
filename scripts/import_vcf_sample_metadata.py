@@ -31,6 +31,7 @@ GROUP_PROJECT = {
     "PAK_iseq": "PRJNA764553",
     "India-6000": "PRJNA625669",
     "LA-PRJNA815364": "PRJNA815364",
+    "LA-PRJNA815364_nextseq500": "PRJNA815364",
     "NJ-PRJNA708324": "PRJNA708324",
     "illumina_miseq": "PRJEB37886",
     "nextseq_500": "PRJEB37886",
@@ -41,14 +42,36 @@ GROUP_PROJECT = {
     "PRJEB46220-Argentina": "PRJEB46220",
     "India-miseq": "PRJNA625669",
     "Port_miseq": "PRJEB47340",
-    "Angola_miseq": "PRJNA782796",
+    "Angola_miseq": "PRJNA717113",
+    "Botswana": "PRJNA782796",
+    "Slovakia_miseq": "PRJEB45305",
     "Thailand_mix": "Thailand_mix",
+    "NM": "PRJNA656534",
+    "VA": "PRJNA625551",
+    "Austr-PRJNA613958_nextseq500": "PRJNA613958",
+    "Austr-PRJNA613958_nextseq550": "PRJNA613958",
 }
 
 EXTRA_META_FILES = {
     "run_metadata.v05-PRJNA782796.csv": "PRJNA782796",
     "run_metadata_Thailand_mix.csv": "Thailand_mix",
 }
+ANGOLA_META_CSV = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-09-28_angola-primer-project"
+    / "files"
+    / "run_metadata.v05-PRJNA717113.csv"
+)
+SLOVAKIA_META_CSV = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-09-24_junction-filter-merges"
+    / "drive"
+    / "Variant_primer_data-20260924T200228Z-1-001.zip"
+)
 
 ISOLATED_GROUPS = ()
 SKIP_PROJECTS = set()
@@ -56,9 +79,23 @@ SKIP_PROJECTS = set()
 DISPLAY_LABELS = {
     "NJ-PRJNA708324": "USA NJ PRJNA708324",
     "PRJNA622837-Broad_Inst": "USA NE, NJ PRJNA622837",
-    "LA-PRJNA815364": "USA LA PRJNA815364",
+    "LA-PRJNA815364": "USA LA MiSeq PRJNA815364",
+    "LA-PRJNA815364_nextseq500": "USA LA NextSeq 500 PRJNA815364",
     "PRJEB46220-Argentina": "Argentina PRJEB46220",
+    "Angola_miseq": "Angola MiSeq PRJNA717113",
+    "Botswana": "Botswana MiSeq PRJNA782796",
+    "Slovakia_miseq": "Slovakia MiSeq PRJEB45305",
+    "NM": "USA NM MiSeq PRJNA656534",
+    "VA": "USA VA MiSeq PRJNA625551",
+    "Austr-PRJNA613958_nextseq500": "Australia NextSeq 500 PRJNA613958",
+    "Austr-PRJNA613958_nextseq550": "Australia NextSeq 550 PRJNA613958",
 }
+
+SEP24_META_FILES = [
+    ("Variant_primer_data/run_metadata.v05-PRJNA656534.csv", "PRJNA656534"),
+    ("Variant_primer_data/run_metadata.v05-PRJNA625551.csv", "PRJNA625551"),
+    ("Variant_primer_data/run_metadata.v05-PRJNA613958.csv", "PRJNA613958"),
+]
 
 
 def decide_eligibility(qc: str | None, has_vcf: bool) -> tuple[bool, str | None]:
@@ -151,6 +188,29 @@ def stream_metadata(wanted_names: set[str]) -> dict[str, dict[str, str]]:
                 continue
             with path.open(newline="", encoding="utf-8", errors="replace") as fh:
                 absorb_metadata_rows(hits, csv.reader(fh), project, path.name, wanted_names)
+    if ANGOLA_META_CSV.is_file():
+        with ANGOLA_META_CSV.open(newline="", encoding="utf-8", errors="replace") as fh:
+            absorb_metadata_rows(
+                hits,
+                csv.reader(fh),
+                "PRJNA717113",
+                ANGOLA_META_CSV.name,
+                wanted_names,
+            )
+    if SLOVAKIA_META_CSV.is_file():
+        with zipfile.ZipFile(SLOVAKIA_META_CSV) as zf:
+            extra = [("Variant_primer_data/run_metadata.v05-PRJEB45305.csv", "PRJEB45305")] + SEP24_META_FILES
+            for inner, project in extra:
+                if inner not in zf.namelist():
+                    continue
+                with zf.open(inner) as fh:
+                    absorb_metadata_rows(
+                        hits,
+                        csv.reader(io.TextIOWrapper(fh, encoding="utf-8", errors="replace")),
+                        project,
+                        Path(inner).name,
+                        wanted_names,
+                    )
     return hits
 
 
@@ -256,18 +316,19 @@ def ensure_argentina_group(cfg: dict) -> None:
     )
 
 
-def apply_rows(cfg: dict, meta_sql: list[str], elig_sql: list[str]) -> None:
+def apply_rows(cfg: dict, meta_sql: list[str], elig_sql: list[str], codes: list[str] | None = None) -> None:
     mysql_run(SCHEMA_SQL.read_text(encoding="utf-8"), cfg)
+    scope = codes if codes else list(GROUP_PROJECT)
     mysql_run(
         "DELETE e FROM vcf_snv_sample_eligibility e "
         "JOIN vcf_snv_group g ON g.id=e.group_id "
         "WHERE g.code IN ("
-        + ",".join(sql_str(c) for c in GROUP_PROJECT)
+        + ",".join(sql_str(c) for c in scope)
         + "); "
         "DELETE m FROM vcf_snv_sample_meta m "
         "JOIN vcf_snv_group g ON g.id=m.group_id "
         "WHERE g.code IN ("
-        + ",".join(sql_str(c) for c in GROUP_PROJECT)
+        + ",".join(sql_str(c) for c in scope)
         + ");",
         cfg,
     )
@@ -295,11 +356,24 @@ def apply_rows(cfg: dict, meta_sql: list[str], elig_sql: list[str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--only", default="", help="Rewrite metadata for these group codes only")
     args = parser.parse_args()
+    only = [part.strip() for part in args.only.split(",") if part.strip()]
+    unknown = [code for code in only if code not in GROUP_PROJECT]
+    if unknown:
+        raise SystemExit("Unknown group " + ", ".join(unknown))
     if not META_ZIP.is_file():
         raise SystemExit("Missing " + str(META_ZIP))
     cfg = parse_connection_php()
     vcf_by_name = load_vcf_samples(cfg)
+    if only:
+        wanted_codes = set(only)
+        filtered: dict[str, list[tuple[int, int, str]]] = {}
+        for name, copies in vcf_by_name.items():
+            kept = [row for row in copies if row[2] in wanted_codes]
+            if kept:
+                filtered[name] = kept
+        vcf_by_name = filtered
     wanted = set(vcf_by_name)
     print("VCF sample IDs in eligible groups:", len(wanted))
     meta_by_name = stream_metadata(wanted)
@@ -316,7 +390,7 @@ def main() -> None:
     if args.dry_run:
         print("dry-run: no database writes")
         return
-    apply_rows(cfg, meta_sql, elig_sql)
+    apply_rows(cfg, meta_sql, elig_sql, only or None)
     ensure_argentina_group(cfg)
     apply_display_labels(cfg)
     print("wrote", len(meta_sql), "meta rows and", len(elig_sql), "eligibility rows")

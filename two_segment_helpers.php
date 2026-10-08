@@ -429,6 +429,31 @@ if (!function_exists('tsg_is_illustrative_junction')) {
     }
 }
 
+if (!function_exists('tsg_repeat_for_display')) {
+    /**
+     * Repeats are shown as DNA: capitals, with U written as T.
+     */
+    function tsg_repeat_for_display($seq)
+    {
+        if ($seq === null) {
+            return null;
+        }
+        $seq = trim((string) $seq);
+        if ($seq === '') {
+            return '';
+        }
+
+        return str_replace('U', 'T', strtoupper($seq));
+    }
+}
+
+if (!function_exists('tsg_sg_label')) {
+    function tsg_sg_label($text)
+    {
+        return str_ireplace('sgmRNA', 'sgRNA', (string) $text);
+    }
+}
+
 if (!function_exists('tsg_junction_size')) {
     function tsg_junction_size($row)
     {

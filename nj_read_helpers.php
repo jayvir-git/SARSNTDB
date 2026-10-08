@@ -312,6 +312,9 @@ if (!function_exists('nj_read_variant_key')) {
         if (!empty($opt['major_only']) && !nj_read_bucket_is_major($bucket)) {
             return null;
         }
+        if (!empty($opt['major_only']) && strpos((string) $label, '+') !== false) {
+            return null;
+        }
         if ($bucket === 'delta' && !empty($opt['merge_delta'])) {
             return 'Delta';
         }
@@ -319,7 +322,7 @@ if (!function_exists('nj_read_variant_key')) {
             return 'Omicron';
         }
         if (!empty($opt['merge_ba']) && $bucket === 'ba') {
-            return 'Omicron BA';
+            return 'BA.2–5';
         }
         if (!empty($opt['merge_xbb']) && $bucket === 'xbb') {
             return 'XBB';
@@ -336,6 +339,17 @@ if (!function_exists('nj_read_variant_display')) {
     function nj_read_variant_display($label)
     {
         return (string) $label === '.' ? 'No variant call (.)' : (string) $label;
+    }
+}
+
+if (!function_exists('nj_read_primer_is_hidden')) {
+    function nj_read_primer_is_hidden($label)
+    {
+        $label = trim((string) $label);
+
+        return $label === '' || $label === '.'
+            || stripos($label, 'Unassigned') !== false
+            || stripos($label, 'Probable') !== false;
     }
 }
 
@@ -382,6 +396,27 @@ if (!function_exists('nj_read_request_group_codes')) {
     }
 }
 
+if (!function_exists('nj_read_filter_group_codes')) {
+    /**
+     * A new filter-table selection checks every group still in the list.
+     * The same selection leaves the group checkboxes as submitted.
+     *
+     * @param list<string> $visibleCodes
+     * @param list<string> $requestedCodes
+     * @return list<string>
+     */
+    function nj_read_filter_group_codes(array $visibleCodes, array $requestedCodes, $keepSig, $previousKeepSig)
+    {
+        $keepSig = (string) $keepSig;
+        $previousKeepSig = (string) $previousKeepSig;
+        if ($keepSig !== '' && $keepSig !== $previousKeepSig) {
+            return array_values($visibleCodes);
+        }
+
+        return array_values($requestedCodes);
+    }
+}
+
 if (!function_exists('nj_read_request_breakdown_by')) {
     function nj_read_request_breakdown_by()
     {
@@ -422,6 +457,16 @@ if (!function_exists('nj_read_request_pick')) {
         if (is_array($raw)) {
             $raw = end($raw);
         }
+        return nj_read_parse_pick($raw);
+    }
+}
+
+if (!function_exists('nj_read_parse_pick')) {
+    /**
+     * @return array{nj_size:int,coord_tag:string}|null
+     */
+    function nj_read_parse_pick($raw)
+    {
         $raw = (string) $raw;
         $bar = strpos($raw, '|');
         if ($bar === false) {
@@ -434,6 +479,35 @@ if (!function_exists('nj_read_request_pick')) {
         }
 
         return ['nj_size' => (int) $size, 'coord_tag' => $tag];
+    }
+}
+
+if (!function_exists('nj_read_request_junction_picks')) {
+    /**
+     * @return list<array{nj_size:int,coord_tag:string}>
+     */
+    function nj_read_request_junction_picks()
+    {
+        $raw = isset($_GET['NjJunction']) ? $_GET['NjJunction'] : [];
+        if (!is_array($raw)) {
+            $raw = [$raw];
+        }
+        $out = [];
+        $seen = [];
+        foreach ($raw as $value) {
+            $pick = nj_read_parse_pick($value);
+            if ($pick === null) {
+                continue;
+            }
+            $key = nj_read_pick_value($pick['nj_size'], $pick['coord_tag']);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $pick;
+        }
+
+        return $out;
     }
 }
 
@@ -456,7 +530,7 @@ if (!function_exists('nj_read_breakdown_choices')) {
             $variant = isset($pair['variant']) ? (string) $pair['variant'] : '';
             $primer = trim(isset($pair['primer']) ? (string) $pair['primer'] : '');
             if ($by === 'primer') {
-                if ($primer === '') {
+                if (nj_read_primer_is_hidden($primer)) {
                     continue;
                 }
                 $seen[$primer] = nj_read_primer_display($primer);
@@ -488,6 +562,36 @@ if (!function_exists('nj_read_breakdown_choices')) {
     }
 }
 
+if (!function_exists('nj_read_option_signature')) {
+    function nj_read_option_signature()
+    {
+        $flags = ['Major', 'MergeDelta', 'MergeOmicron', 'MergeBa', 'MergeXbb', 'HideBa1'];
+        $parts = [];
+        foreach ($flags as $name) {
+            $parts[] = nj_read_request_flag($name, $name === 'Major') ? '1' : '0';
+        }
+
+        return implode('', $parts);
+    }
+}
+
+if (!function_exists('nj_read_column_reset_requested')) {
+    /**
+     * A new filter mode or merge selection starts with every column checked.
+     */
+    function nj_read_column_reset_requested()
+    {
+        $by = isset($_GET['NjBy']) ? (string) $_GET['NjBy'] : '';
+        $prevBy = isset($_GET['NjBySig']) ? (string) $_GET['NjBySig'] : '';
+        if ($prevBy !== '' && $by !== '' && $prevBy !== $by) {
+            return true;
+        }
+        $opt = isset($_GET['NjOptSig']) ? (string) $_GET['NjOptSig'] : '';
+
+        return $opt !== '' && $opt !== nj_read_option_signature();
+    }
+}
+
 if (!function_exists('nj_read_request_columns')) {
     /**
      * @param list<array{key:string,label:string}> $choices
@@ -496,8 +600,13 @@ if (!function_exists('nj_read_request_columns')) {
     function nj_read_request_columns(array $choices)
     {
         $allowed = [];
+        $all = [];
         foreach ($choices as $choice) {
             $allowed[$choice['key']] = true;
+            $all[] = $choice['key'];
+        }
+        if (!isset($_GET['NjColSet']) || nj_read_column_reset_requested()) {
+            return $all;
         }
         $raw = isset($_GET['NjCol']) ? $_GET['NjCol'] : [];
         if (!is_array($raw)) {
@@ -510,6 +619,7 @@ if (!function_exists('nj_read_request_columns')) {
                 $picked[] = $key;
             }
         }
+
         return $picked;
     }
 }
@@ -519,7 +629,7 @@ if (!function_exists('nj_read_column_key')) {
     {
         $primer = trim((string) $primerLabel);
         if ($by === 'primer') {
-            return $primer === '' ? null : $primer;
+            return nj_read_primer_is_hidden($primer) ? null : $primer;
         }
         $variant = nj_read_variant_key($variantLabel, $mergeDelta);
         if ($variant === null) {
@@ -796,6 +906,47 @@ if (!function_exists('nj_read_breakdown_raw')) {
         $stmt->close();
 
         return $rows;
+    }
+}
+
+if (!function_exists('nj_read_early_counts')) {
+    /**
+     * Early is a 2020–2021 list sample whose variant is "." or blank.
+     * A group with no list contributes nothing. "." off the list is ignored.
+     *
+     * @return array<int,int>
+     */
+    function nj_read_early_counts(mysqli $con)
+    {
+        $check = $con->query("SHOW TABLES LIKE 'vcf_snv_early_sample'");
+        if (!$check || $check->num_rows < 1) {
+            if ($check) {
+                $check->free();
+            }
+
+            return [];
+        }
+        $check->free();
+        $res = $con->query(
+            'SELECT e.group_id, COUNT(*) AS n
+               FROM vcf_snv_early_sample e
+               LEFT JOIN vcf_snv_sample_meta m
+                 ON m.group_id = e.group_id AND m.sample_name = e.sample_name
+              WHERE m.id IS NULL
+                 OR m.variant_label IS NULL
+                 OR TRIM(m.variant_label) = \'.\'
+                 OR TRIM(m.variant_label) = \'\'
+              GROUP BY e.group_id'
+        );
+        $out = [];
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $out[(int) $row['group_id']] = (int) $row['n'];
+            }
+            $res->free();
+        }
+
+        return $out;
     }
 }
 

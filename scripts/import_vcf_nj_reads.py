@@ -44,6 +44,11 @@ NJ_BASES = [
     ("Broad_6000_", "PRJNA622837-Broad_Inst"),
     ("Port_0-12_", "Port-PRJEB47340"),
     ("Ang_miseq_", "Angola_miseq"),
+    ("Austr_nextseq550_", "Austr-PRJNA613958_nextseq550"),
+    ("Austr_nextseq500_", "Austr-PRJNA613958_nextseq500"),
+    ("PRJNA656534-NM_", "NM"),
+    ("PRJNA625551-VA_", "VA"),
+    ("Slovakia_", "Slovakia_miseq"),
     ("Botswana_", "Botswana"),
     ("PAK-iseq_", "PAK_iseq"),
     ("UK_miseq_", "illumina_miseq"),
@@ -70,10 +75,41 @@ LIST_FILES = {
     "UK_miseq_unique_csv.txt": "illumina_miseq",
     "UK_nextseq500_unique_csv.txt": "nextseq_500",
     "UK_nextseq550_unique_csv.txt": "nextseq_550",
+    "Slovakia_unique_csv.txt": "Slovakia_miseq",
+    "NM_unique_csv.txt": "NM",
+    "VA_unique_csv.txt": "VA",
+    "Austr_nextseq500_unique_csv.txt": "Austr-PRJNA613958_nextseq500",
+    "Austr_nextseq550_unique_csv.txt": "Austr-PRJNA613958_nextseq550",
 }
 
+SLOVAKIA_LIST_ZIP = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-09-24_junction-filter-merges"
+    / "drive"
+    / "sample_lists_unique_csv-20260924T195939Z-1-001.zip"
+)
+SLOVAKIA_NJ_ZIP = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-09-24_junction-filter-merges"
+    / "drive"
+    / "NJ_data-20260924T195018Z-1-001.zip"
+)
+SLOVAKIA_SRA = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-09-28_early-column-filter-bugs"
+    / "files"
+    / "SraRunTable-PRJEB45305-Slovakia-miseq-no_Switz.csv"
+)
+
 SRA_BY_CODE = {
-    "LA-PRJNA815364": "SraRunTable-PRJNA815364-LA_103024-NextSeq500.csv",
+    "LA-PRJNA815364": "SraRunTable-PRJNA815364-LA_103024-MiSeq.csv",
+    "LA-PRJNA815364_nextseq500": "SraRunTable-PRJNA815364-LA_103024-NextSeq500.csv",
 }
 
 
@@ -269,8 +305,158 @@ def ensure_coord_tag(cfg: dict) -> None:
         )
 
 
+def apply_list_eligibility(cfg: dict, gid: int) -> None:
+    mysql_run(
+        "UPDATE vcf_snv_sample_eligibility e "
+        "JOIN vcf_snv_sample s ON s.id = e.sample_id "
+        "LEFT JOIN vcf_snv_nj_sample_list l "
+        "  ON l.group_id = e.group_id AND l.sample_name = s.sample_name "
+        "SET e.eligible = CASE "
+        "  WHEN e.qc = 'PASS' AND l.sample_name IS NOT NULL AND ("
+        "    NOT EXISTS (SELECT 1 FROM vcf_snv_sra_sample a WHERE a.group_id = e.group_id) "
+        "    OR EXISTS (SELECT 1 FROM vcf_snv_sra_sample a "
+        "               WHERE a.group_id = e.group_id AND a.sample_name = s.sample_name)"
+        "  ) THEN 1 ELSE 0 END, "
+        "e.exclusion_reason = CASE "
+        "  WHEN e.qc IS NULL OR e.qc = '' THEN 'unmatched' "
+        "  WHEN e.qc <> 'PASS' THEN 'fail_qc' "
+        "  WHEN l.sample_name IS NULL THEN 'no_sample_list' "
+        "  WHEN EXISTS (SELECT 1 FROM vcf_snv_sra_sample a WHERE a.group_id = e.group_id) "
+        "   AND NOT EXISTS (SELECT 1 FROM vcf_snv_sra_sample a "
+        "                   WHERE a.group_id = e.group_id AND a.sample_name = s.sample_name) "
+        "  THEN 'not_in_sra' "
+        "  ELSE NULL END "
+        "WHERE e.group_id = " + str(gid),
+        cfg,
+    )
+
+
+def sra_ids_from_csv(path: Path) -> list[str]:
+    ids = []
+    with path.open(newline="", encoding="utf-8", errors="replace") as fh:
+        for row in csv.reader(fh):
+            if not row:
+                continue
+            sample = row[0].strip()
+            if sample == "" or sample.lower() == "run":
+                continue
+            ids.append(sample)
+    return ids
+
+
+def load_only(codes: list[str]) -> None:
+    """Reload NJ reads, sample list, and SRA for these groups only."""
+    global ALLOWED
+    cfg = parse_connection_php()
+    mysql_run(SCHEMA_SQL.read_text(encoding="utf-8"), cfg)
+    ensure_coord_tag(cfg)
+    groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
+    ALLOWED = set()
+    for size, tag in mysql_pairs("SELECT nj_size, coord_tag FROM vcf_snv_nj_catalog", cfg):
+        ALLOWED.add((int(size), tag))
+
+    list_ids: dict[str, list[str]] = {}
+    if SLOVAKIA_LIST_ZIP.is_file():
+        with zipfile.ZipFile(SLOVAKIA_LIST_ZIP) as zf:
+            for info in zf.infolist():
+                code = LIST_FILES.get(Path(info.filename).name)
+                if code is None or code not in codes:
+                    continue
+                text = zf.read(info).decode("utf-8", errors="replace")
+                list_ids[code] = [
+                    sample_id_from_list_line(line) for line in text.splitlines() if sample_id_from_list_line(line)
+                ]
+    for path in find_files(DRIVE / "sample_lists"):
+        code = LIST_FILES.get(path.name)
+        if code is None or code not in codes:
+            continue
+        ids = []
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            sample = sample_id_from_list_line(line)
+            if sample:
+                ids.append(sample)
+        list_ids[code] = ids
+
+    for code in codes:
+        if code not in groups:
+            print("missing group", code)
+            continue
+        gid = groups[code]
+        mysql_run(
+            "DELETE FROM vcf_snv_nj_read WHERE group_id=" + str(gid) + "; "
+            "DELETE FROM vcf_snv_nj_sample_list WHERE group_id=" + str(gid) + "; "
+            "DELETE FROM vcf_snv_sra_sample WHERE group_id=" + str(gid) + ";",
+            cfg,
+        )
+        ids = list_ids.get(code, [])
+        tuples = ["(" + str(gid) + "," + sql_str(sample) + ")" for sample in ids]
+        for batch in chunked(tuples, 500):
+            insert_values("vcf_snv_nj_sample_list", "group_id,sample_name", batch, cfg)
+        print(f"list {code} {len(ids)}")
+        if code == "Slovakia_miseq" and SLOVAKIA_SRA.is_file():
+            sra = ["(" + str(gid) + "," + sql_str(sample) + ")" for sample in sra_ids_from_csv(SLOVAKIA_SRA)]
+            for batch in chunked(sra, 500):
+                insert_values("vcf_snv_sra_sample", "group_id,sample_name", batch, cfg)
+            print(f"sra {code} {len(sra)}")
+
+    roots = [DRIVE / "nj"]
+    if SLOVAKIA_NJ_ZIP.is_file():
+        roots.append(SLOVAKIA_NJ_ZIP.parent)
+    pending: list[str] = []
+    read_counts: dict[str, int] = {}
+    wanted = set(codes)
+    for nj_root in roots:
+        for code, sample, size, tag, reads in iter_coord_rows(nj_root):
+            if code not in wanted or code not in groups:
+                continue
+            gid = groups[code]
+            pending.append(
+                "("
+                + str(gid)
+                + ","
+                + sql_str(sample)
+                + ","
+                + str(size)
+                + ","
+                + sql_str(tag)
+                + ","
+                + str(max(0, reads))
+                + ")"
+            )
+            read_counts[code] = read_counts.get(code, 0) + 1
+            if len(pending) >= 400:
+                insert_values(
+                    "vcf_snv_nj_read",
+                    "group_id,sample_name,nj_size,coord_tag,read_count",
+                    pending,
+                    cfg,
+                )
+                pending = []
+    if pending:
+        insert_values(
+            "vcf_snv_nj_read",
+            "group_id,sample_name,nj_size,coord_tag,read_count",
+            pending,
+            cfg,
+        )
+    for code, n in sorted(read_counts.items()):
+        print(f"reads {code} {n}")
+    for code in codes:
+        if code in groups and code in list_ids:
+            apply_list_eligibility(cfg, groups[code])
+            print("eligibility updated", code)
+
+
 def main() -> None:
     global ALLOWED
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--only", default="", help="Reload these group codes only")
+    args = parser.parse_args()
+    if args.only.strip():
+        load_only([part.strip() for part in args.only.split(",") if part.strip()])
+        return
     cfg = parse_connection_php()
     mysql_run(SCHEMA_SQL.read_text(encoding="utf-8"), cfg)
     ensure_coord_tag(cfg)
@@ -395,30 +581,7 @@ def main() -> None:
         print("skipped lists:", ", ".join(sorted(set(skipped_lists))))
 
     for code in loaded_lists:
-        gid = groups[code]
-        sql = (
-            "UPDATE vcf_snv_sample_eligibility e "
-            "JOIN vcf_snv_sample s ON s.id = e.sample_id "
-            "LEFT JOIN vcf_snv_nj_sample_list l "
-            "  ON l.group_id = e.group_id AND l.sample_name = s.sample_name "
-            "SET e.eligible = CASE "
-            "  WHEN e.qc = 'PASS' AND l.sample_name IS NOT NULL AND ("
-            "    NOT EXISTS (SELECT 1 FROM vcf_snv_sra_sample a WHERE a.group_id = e.group_id) "
-            "    OR EXISTS (SELECT 1 FROM vcf_snv_sra_sample a "
-            "               WHERE a.group_id = e.group_id AND a.sample_name = s.sample_name)"
-            "  ) THEN 1 ELSE 0 END, "
-            "e.exclusion_reason = CASE "
-            "  WHEN e.qc IS NULL OR e.qc = '' THEN 'unmatched' "
-            "  WHEN e.qc <> 'PASS' THEN 'fail_qc' "
-            "  WHEN l.sample_name IS NULL THEN 'no_sample_list' "
-            "  WHEN EXISTS (SELECT 1 FROM vcf_snv_sra_sample a WHERE a.group_id = e.group_id) "
-            "   AND NOT EXISTS (SELECT 1 FROM vcf_snv_sra_sample a "
-            "                   WHERE a.group_id = e.group_id AND a.sample_name = s.sample_name) "
-            "  THEN 'not_in_sra' "
-            "  ELSE NULL END "
-            "WHERE e.group_id = " + str(gid)
-        )
-        mysql_run(sql, cfg)
+        apply_list_eligibility(cfg, groups[code])
         print("eligibility updated", code)
 
 

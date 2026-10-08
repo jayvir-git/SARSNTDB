@@ -35,6 +35,14 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             if (!isset($row['junction_kind'])) {
                 $row['junction_kind'] = 'CJ';
             }
+            if (tsg_is_illustrative_junction($row)) {
+                continue;
+            }
+            $row['subtype'] = tsg_sg_label(isset($row['subtype']) ? $row['subtype'] : '');
+            $row['name'] = tsg_sg_label(isset($row['name']) ? $row['name'] : '');
+            if (array_key_exists('repeat_seq', $row)) {
+                $row['repeat_seq'] = tsg_repeat_for_display($row['repeat_seq']);
+            }
             $rows[] = $row;
         }
         $result->free();
@@ -109,7 +117,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
         <p style="font-size:13px; max-width:900px;">
             Select entries that have two genome segments separated by a gap (conceptual fields:
             <code>from</code>, <code>left</code>, <code>right</code>, <code>to</code>, <code>repeat</code>, <code>link</code> reserved).
-            The first implemented subtype is <strong>sgmRNA</strong>; additional subtypes can use the same table and UI.
+            The first implemented subtype is <strong>sgRNA</strong>; additional subtypes can use the same table and UI.
             For group / variant / primer percents on junction 5249–23191, open
             <a href="JunctionGroupQuery.php?left=5249&amp;right=23191">Junction groups</a>.
         </p>
