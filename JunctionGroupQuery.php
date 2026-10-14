@@ -557,12 +557,12 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     </div>
     <div class="panel-body">
         <p class="jq-note">
-            Prototype for non-canonical junction
+            A <strong>group</strong> is one project (or several from one facility) on one instrument in one place (example: USA NJ MiSeq PRJNA708324).
+            The junction tables use <code>-1</code> for a count under the minimum and <code>0</code> for a real zero.
+            The chart and count tables at the bottom are the earlier view of junction
             <strong><?php echo (int) $left; ?>–<?php echo (int) $right; ?></strong>
-            (size <?php echo (int) $size; ?>).
-            A <strong>group</strong> is a location plus an instrument (example: New Jersey MiSeq).
-            Percent tables: <strong>—</strong> means <code>-1</code> (no samples).
-            Count tables use <strong>Viridian variant calls</strong> and <strong>Viridian primer calls</strong> (NJ and NM examples for now).
+            (size <?php echo (int) $size; ?>): there a dash means no samples, and the
+            <strong>Viridian variant</strong> and <strong>primer</strong> counts cover the NJ and NM groups only.
         </p>
 
         <?php if ($dbError !== null) : ?>

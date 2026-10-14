@@ -65,14 +65,14 @@ if (!function_exists('tsg_fetch_overlapping')) {
         $lo = (int) $lo;
         $hi = (int) $hi;
         $rows = [];
-        $sql = 'SELECT id, subtype, junction_kind, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, display_order
+        $sql = 'SELECT id, subtype, junction_kind, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, display_order, notes
                 FROM two_segment_structure
                 WHERE (coord_left >= ' . $lo . ' AND coord_left <= ' . $hi . ')
                    OR (coord_right >= ' . $lo . ' AND coord_right <= ' . $hi . ')
                 ORDER BY display_order ASC, id ASC';
         $result = $con->query($sql);
         if (!$result && (int) $con->errno === 1054) {
-            $sql = 'SELECT id, subtype, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, display_order
+            $sql = 'SELECT id, subtype, name, coord_from, coord_left, coord_right, coord_to, repeat_seq, display_order, notes
                 FROM two_segment_structure
                 WHERE (coord_left >= ' . $lo . ' AND coord_left <= ' . $hi . ')
                    OR (coord_right >= ' . $lo . ' AND coord_right <= ' . $hi . ')
@@ -83,6 +83,9 @@ if (!function_exists('tsg_fetch_overlapping')) {
             while ($row = $result->fetch_assoc()) {
                 if (!isset($row['junction_kind'])) {
                     $row['junction_kind'] = 'CJ';
+                }
+                if (tsg_is_illustrative_junction($row)) {
+                    continue;
                 }
                 $rows[] = $row;
             }
@@ -110,11 +113,11 @@ if (!function_exists('tsg_rows_matching_repeat')) {
         $lu = strtolower($userRepeat);
         $out = [];
         $seen = [];
-        $sql = 'SELECT id, name, junction_kind, repeat_seq FROM two_segment_structure
+        $sql = 'SELECT id, name, junction_kind, repeat_seq, notes FROM two_segment_structure
                 WHERE repeat_seq IS NOT NULL AND TRIM(repeat_seq) <> \'\'';
         $res = $con->query($sql);
         if (!$res && (int) $con->errno === 1054) {
-            $sql = 'SELECT id, name, repeat_seq FROM two_segment_structure
+            $sql = 'SELECT id, name, repeat_seq, notes FROM two_segment_structure
                 WHERE repeat_seq IS NOT NULL AND TRIM(repeat_seq) <> \'\'';
             $res = $con->query($sql);
         }
@@ -124,6 +127,9 @@ if (!function_exists('tsg_rows_matching_repeat')) {
         while ($row = $res->fetch_assoc()) {
             if (!isset($row['junction_kind'])) {
                 $row['junction_kind'] = 'CJ';
+            }
+            if (tsg_is_illustrative_junction($row)) {
+                continue;
             }
             $r = strtolower(trim((string) $row['repeat_seq']));
             if ($r === '') {

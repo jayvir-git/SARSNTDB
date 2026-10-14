@@ -169,11 +169,11 @@
   <div class="panel panel-default" style="margin: 0 15px 12px 15px;">
     <div class="panel-heading" style="font-size:13px;"><strong>Junction table (CJ / NJ)</strong></div>
     <div class="panel-body" style="font-size:12px; padding-top:8px;">
-      <p style="margin:0 0 8px 0;">This repeat matches one or more entries in the two-segment (sgmRNA) junction list. Open the schematic for the same graphic as Genome search links.</p>
+      <p style="margin:0 0 8px 0;">This repeat matches one or more entries in the two-segment (sgRNA) junction list. Open the schematic for the same graphic as Genome search links.</p>
       <ul style="margin-bottom:0;">
         <?php foreach ($tsgRepeatMatches as $jm) :
             $jk = htmlspecialchars(tsg_junction_kind_label($jm), ENT_QUOTES, 'UTF-8');
-            $jn = htmlspecialchars($jm['name'], ENT_QUOTES, 'UTF-8');
+            $jn = htmlspecialchars(tsg_sg_label($jm['name']), ENT_QUOTES, 'UTF-8');
             $ju = htmlspecialchars(tsg_viz_url((int) $jm['id']), ENT_QUOTES, 'UTF-8');
             ?>
         <li><?php echo $jk; ?> — <?php echo $jn; ?> — <a href="<?php echo $ju; ?>">Two-segment schematic</a></li>

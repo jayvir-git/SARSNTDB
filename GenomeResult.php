@@ -255,19 +255,24 @@ session_start();
 
   <script type="text/javascript">
 
+    // Runs after the page loads: #repeatBlock is further down the body.
+    document.addEventListener("DOMContentLoaded", function () {
     var repeatBlock=document.getElementById("repeatBlock")
     var protTest = '<?php echo $runRepeat ;?>';
-
+    if (!repeatBlock) {
+      return;
+    }
 
     if (protTest == true){
-      repeatBlock.className.remove("repeatgrid");
-      repeatBlock.className.add("datagrid");
+      repeatBlock.classList.remove("repeatgrid");
+      repeatBlock.classList.add("datagrid");
       // console.log(<?php  echo $runRepeat; ?>);
 
     }else{
-      repeatBlock.className.remove("datagrid");
-      repeatBlock.className.add("repeatgrid");
+      repeatBlock.classList.remove("datagrid");
+      repeatBlock.classList.add("repeatgrid");
     }
+    });
 
     
   </script>
@@ -401,7 +406,7 @@ session_start();
       </table>
     </div>
 
-    <h4 class="search-header">Junction structures (sgmRNA)</h4>
+    <h4 class="search-header">Junction structures (sgRNA)</h4>
     <p class="text-muted" style="margin-bottom:8px; font-size:12px;">Canonical (CJ) and non-canonical (NJ) junctions whose <strong>left</strong> or <strong>right</strong> gap border lies in your coordinate interval. Each row links to the same two-segment schematic view. Open the <a href="TwoSegmentStructures.php">full CJ/NJ table</a> for browsing without a genome interval.</p>
     <div class="datagrid" style="max-height:280px; margin-bottom:12px;">
       <table class="table">
@@ -431,9 +436,9 @@ session_start();
           } else {
             foreach ($tsgRowsOverlap as $tsgRow) {
               $kind = htmlspecialchars(tsg_junction_kind_label($tsgRow), ENT_QUOTES, 'UTF-8');
-              $nm = htmlspecialchars($tsgRow['name'], ENT_QUOTES, 'UTF-8');
+              $nm = htmlspecialchars(tsg_sg_label($tsgRow['name']), ENT_QUOTES, 'UTF-8');
               $rep = isset($tsgRow['repeat_seq']) && $tsgRow['repeat_seq'] !== ''
-                ? htmlspecialchars($tsgRow['repeat_seq'], ENT_QUOTES, 'UTF-8') : '—';
+                ? htmlspecialchars(tsg_repeat_for_display($tsgRow['repeat_seq']), ENT_QUOTES, 'UTF-8') : '—';
               $id = (int) $tsgRow['id'];
               $viz = '<a href="' . htmlspecialchars(tsg_viz_url($id), ENT_QUOTES, 'UTF-8') . '">Schematic</a>';
               echo '<tr>';
