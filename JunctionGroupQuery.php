@@ -527,6 +527,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
         .jq-chart { height: 420px; width: 100%; margin: 12px 0 8px 0; }
         .jq-note { font-size: 13px; max-width: 980px; }
         tr.darkheader th { background: #333; color: #fff; position: sticky; top: 0; }
+        .jq-keep-all { font-weight: normal; margin: 0; white-space: nowrap; color: inherit; cursor: pointer; }
         .jq-table-wrap thead {
             position: sticky;
             top: 0;
@@ -618,7 +619,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                                 <table class="table table-bordered table-striped jq-table<?php echo $njFilterMode === 'pair' ? ' jq-pair' : ''; ?> sortable">
                                     <thead>
                                         <tr class="darkheader">
-                                            <th<?php echo $njFilterMode === 'pair' ? ' rowspan="2"' : ''; ?>>Select</th>
+                                            <th<?php echo $njFilterMode === 'pair' ? ' rowspan="2"' : ''; ?>><label class="jq-keep-all"><input type="checkbox" class="nj-select-all" data-nj-target="jqFilterKeep" /> Select all</label></th>
                                             <th class="jq-group"<?php echo $njFilterMode === 'pair' ? ' rowspan="2"' : ''; ?>>Group</th>
                                             <?php if ($njFilterMode === 'variant') : ?>
                                                 <th>Type</th>
@@ -654,7 +655,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                                             </tr>
                                         <?php endif; ?>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="jqFilterKeep">
                                     <?php foreach ($vcfGroups as $filterIndex => $filterGroup) : ?>
                                         <?php $filterLine = $njFilterTable['rows'][$filterIndex]; ?>
                                         <tr>
@@ -1076,6 +1077,9 @@ if (window.JunctionQueryCharts) {
     $('#MergeOmicron').on('change', function () {
         syncOmicronMerges();
         submitFilterForm();
+    });
+    $('#jqFilterGroups').on('click', '.jq-keep-all', function (ev) {
+        ev.stopPropagation();
     });
     $('.nj-select-all').each(function () {
         var $all = $(this);

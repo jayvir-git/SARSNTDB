@@ -44,11 +44,16 @@ if (!function_exists('vcf_snv_workbook_visible_codes')) {
             'India-6000',
             'PAK_iseq',
             'illumina_miseq',
+            'illumina_hiseq_2500',
             'nextseq_500',
             'nextseq_550',
             'LA-PRJNA815364',
             'LA-PRJNA815364_nextseq500',
             'PRJNA622837-Broad_Inst',
+            'PRJNA746690-CA',
+            'PRJNA744530-RI',
+            'Denmark-nextseq550',
+            'PRJEB72496-Denmark-6000',
             'NJ-PRJNA708324',
             'S_Afr-PRJNA636748',
             'Port-PRJEB47340',
@@ -63,6 +68,7 @@ if (!function_exists('vcf_snv_workbook_visible_codes')) {
             'Austr-PRJNA613958_nextseq550',
             'India-miseq',
             'Thailand_mix',
+            'Est-mix',
         ];
     }
 }
@@ -87,7 +93,11 @@ if (!function_exists('vcf_snv_group_display_label')) {
     {
         $labels = [
             'NJ-PRJNA708324' => 'USA NJ MiSeq PRJNA708324',
-            'PRJNA622837-Broad_Inst' => 'USA NE, NJ NovaSeq 6000 PRJNA622837',
+            'PRJNA622837-Broad_Inst' => 'USA NE, NJ NovaSeq 6000 PRJNA622837 and PRJNA715749',
+            'PRJNA746690-CA' => 'USA CA MiSeq PRJNA746690',
+            'PRJNA744530-RI' => 'USA RI MiSeq PRJNA744530',
+            'Denmark-nextseq550' => 'Denmark NextSeq 550 PRJEB49401 and PRJEB72496',
+            'PRJEB72496-Denmark-6000' => 'Denmark NovaSeq 6000 PRJEB72496',
             'LA-PRJNA815364' => 'USA LA MiSeq PRJNA815364',
             'LA-PRJNA815364_nextseq500' => 'USA LA NextSeq 500 PRJNA815364',
             'PRJEB46220-Argentina' => 'Argentina MiSeq PRJEB46220',

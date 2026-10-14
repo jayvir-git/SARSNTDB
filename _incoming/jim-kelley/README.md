@@ -64,6 +64,8 @@ Importers read this folder by filename. Do not move these until those scripts ar
 | `2026-10-01_pair-table-csv/` (email only) | CSV download for the variant–primer filter table. PCA test 2: min 20, LA NextSeq 500, NJ, NM, VA, merge Delta and XBB, export every junction. | Live on `jtc240/njdb` 1 Oct. Download link on the filter table that is showing. PCA test 2 is a use case only. |
 | `2026-10-01_pair-header-scroll/` (email only) | The variant–primer header changes while scrolling. Captures named start and end were not in the inbox. | Live on `jtc240/njdb` 1 Oct. The two header rows stick together. |
 | `2026-10-07_snv-primer-pair-compare/` (email only; reply same day) | One group, two variant–primer pairs. Columns: SNV name, % in each pair, Rel. % Diff. Defaults stay editable (AF, min samples, min %). Example is NJ Delta V3 vs Delta V4.1. | Live on `jtc240/njdb` 7 Oct. |
+| `2026-10-09_snv-pair-csv/` (email only) | CSV export of the variant–primer SNV comparison. He said the table looks good. | Live on `jtc240/njdb` 9 Oct. “Download this table” on the comparison result. |
+| `2026-10-12_ca-ri-broad-denmark/` (`files/Groups_101226_with_nj_data-early.xlsx`, `drive/` coord CSVs) | Replaces the 28 Sep groups sheet. Adds USA CA, USA RI, and two Denmark groups. Broad is now PRJNA622837 and PRJNA715749. Sample lists `Broad_all_uniq_1012_csv.txt` and `PRJEB72496-Denmark_6000_unique_csv.txt` and the Denmark NovaSeq 6000 coord set were added 13 Oct. An empty coord file means that deletion is not present. Estonia (`Est-mix`) and United Kingdom HiSeq 2500 were loaded the same day. A VCF of size 0 is not inserted as a sample. Estonia has no Early list. | Live on `jtc240/njdb` 13 Oct, including Estonia and UK HiSeq 2500. |
 
 ## Next email
 

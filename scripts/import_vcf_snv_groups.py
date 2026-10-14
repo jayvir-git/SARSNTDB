@@ -61,6 +61,16 @@ MERGE_GROUPS = {
         "PRJEB46220-Argentina-bwa-pad",
         "PRJEB46220-Argentina-new-bwa-pad",
     ),
+    # 12 Oct: replace the PRJNA622837-only Broad set with both Broad projects.
+    "PRJNA622837-Broad_Inst": (
+        "PRJNA622837-Broad_Inst-bwa-pad",
+        "PRJNA715749-Broad-bwa-pad",
+    ),
+    # 12 Oct: one NextSeq 550 group from two Denmark projects.
+    "Denmark-nextseq550": (
+        "PRJEB49401-Denmark-bwa-pad",
+        "PRJEB72496-Denmark-550-bwa-pad",
+    ),
 }
 MERGE_ZIP_STEMS = {stem: code for code, stems in MERGE_GROUPS.items() for stem in stems}
 
@@ -78,10 +88,16 @@ GROUP_LABELS = {
     "Port_miseq": "Portugal MiSeq",
     "Angola_miseq": "Angola MiSeq",
     "PRJEB46220-Argentina": "Argentina PRJEB46220",
-    "PRJNA622837-Broad_Inst": "USA NE, NJ PRJNA622837",
+    "PRJNA622837-Broad_Inst": "USA NE, NJ NovaSeq 6000 PRJNA622837 and PRJNA715749",
+    "PRJNA746690-CA": "USA CA MiSeq PRJNA746690",
+    "PRJNA744530-RI": "USA RI MiSeq PRJNA744530",
+    "Denmark-nextseq550": "Denmark NextSeq 550 PRJEB49401 and PRJEB72496",
+    "PRJEB72496-Denmark-6000": "Denmark NovaSeq 6000 PRJEB72496",
     "Russia682735": "Russia",
     "S_Afr-PRJNA636748": "South Africa MiSeq",
     "Thailand_mix": "Thailand",
+    "Est-mix": "Estonia many #s",
+    "illumina_hiseq_2500": "United Kingdom HiSeq 2500 PRJEB37886",
 }
 
 
@@ -187,6 +203,9 @@ def iter_vcf_from_zip(zip_path: Path):
             name = info.filename.replace("\\", "/")
             if not name.lower().endswith(".vcf"):
                 continue
+            # A 0-byte VCF means that sample does not exist.
+            if info.file_size == 0:
+                continue
             with zf.open(info) as handle:
                 wrapper = io.TextIOWrapper(handle, encoding="utf-8", errors="replace")
                 text = wrapper.read()
@@ -195,6 +214,8 @@ def iter_vcf_from_zip(zip_path: Path):
 
 def iter_vcf_from_dir(folder: Path):
     for path in sorted(folder.rglob("*.vcf")):
+        if path.stat().st_size == 0:
+            continue
         text = path.read_text(encoding="utf-8", errors="replace")
         yield str(path), text.splitlines()
 
