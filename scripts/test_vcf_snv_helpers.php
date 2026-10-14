@@ -39,7 +39,7 @@ expect(in_array('PRJNA622837-Broad_Inst', vcf_snv_workbook_visible_codes(), true
 expect(in_array('PRJEB46220-Argentina', vcf_snv_workbook_visible_codes(), true), 'Argentina is on the allowlist');
 expect(vcf_snv_isolated_group_codes() === [], 'no groups are isolated');
 expect(vcf_snv_group_display_label('NJ-PRJNA708324', 'NJ PRJNA708324') === 'USA NJ MiSeq PRJNA708324', 'NJ label includes MiSeq');
-expect(vcf_snv_group_display_label('PRJNA622837-Broad_Inst', 'Broad Institute') === 'USA NE, NJ NovaSeq 6000 PRJNA622837', 'Broad label includes NovaSeq');
+expect(vcf_snv_group_display_label('PRJNA622837-Broad_Inst', 'Broad Institute') === 'USA NE, NJ NovaSeq 6000 PRJNA622837 and PRJNA715749', 'Broad label includes NovaSeq');
 expect(vcf_snv_group_is_visible('LA-PRJNA815364') === true, 'LA MiSeq visible');
 expect(vcf_snv_group_display_label('LA-PRJNA815364', '') === 'USA LA MiSeq PRJNA815364', 'LA MiSeq label');
 expect(vcf_snv_group_is_visible('LA-PRJNA815364_nextseq500') === true, 'LA NextSeq 500 visible');
@@ -53,6 +53,10 @@ expect(vcf_snv_group_display_label('Botswana', '') === 'Botswana MiSeq PRJNA7827
 expect(vcf_snv_group_is_visible('Botswana') === true, 'Botswana visible');
 expect(vcf_snv_group_display_label('Slovakia_miseq', '') === 'Slovakia MiSeq PRJEB45305', 'Slovakia label');
 expect(vcf_snv_group_is_visible('Slovakia_miseq') === true, 'Slovakia visible');
+expect(vcf_snv_group_is_visible('illumina_hiseq_2500') === true, 'UK HiSeq 2500 visible');
+expect(vcf_snv_group_display_label('illumina_hiseq_2500', '') === 'United Kingdom HiSeq 2500 PRJEB37886', 'UK HiSeq 2500 label');
+expect(vcf_snv_group_is_visible('Est-mix') === true, 'Estonia visible');
+expect(vcf_snv_group_display_label('Est-mix', '') === 'Estonia many #s', 'Estonia label');
 
 expect(vcf_snv_eligibility_reason('PASS', true) === '', 'PASS and VCF eligible');
 expect(vcf_snv_sample_is_eligible('PASS', true) === true, 'sample_is_eligible PASS');

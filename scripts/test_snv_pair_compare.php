@@ -84,6 +84,19 @@ expect(strpos($html, 'Rel. % Diff') !== false, 'the table names the relative col
 expect(strpos($html, '% SNV in Delta V3') !== false && strpos($html, 'C50T') !== false, 'the table shows the SNV and both pair headers');
 expect(strpos($html, 'leaves out 1 sample') !== false, 'a merged pair says when a subtype was left out');
 
+$csv = snv_pair_csv_text($rows, ['label' => 'USA NJ', 'code' => 'NJ-PRJNA708324'], $deltaV3, [
+    'label' => 'Delta V4.1',
+    'n' => 12,
+    'raw' => 12,
+], 0.8, 1);
+expect(strpos($csv, "SNV,% SNV in Delta V3,% SNV in Delta V4.1,Rel. % Diff\n") !== false, 'csv headers match the table');
+expect(strpos($csv, "C50T,0.00,10.00,200.00\n") !== false, 'csv keeps the larger relative difference');
+expect(strpos($csv, "A100G,10.00,30.00,100.00\n") !== false, 'csv keeps both percents');
+expect(strpos($csv, 'G80A') === false, 'csv omits a call under 1% in both pairs');
+expect(snv_pair_csv_filename(['code' => 'NJ-PRJNA708324', 'label' => 'USA NJ'], $deltaV3, ['label' => 'Delta V4.1'], 0.8, 30) === 'snv-pairs_NJ-PRJNA708324_Delta_V3_Delta_V4.1_minAf0.80_min30.csv', 'csv name records the group, pairs, and cutoffs');
+$linked = snv_pair_render($rows, ['label' => 'USA NJ'], $deltaV3, ['label' => 'Delta V4.1', 'n' => 12, 'raw' => 12], 0.8, 1, 'SnvPairCompare.php?what=csv&Group=NJ');
+expect(strpos($linked, 'Download this table') !== false, 'the table offers a csv download');
+
 if ($failed > 0) {
     echo "$failed failed\n";
     exit(1);

@@ -30,6 +30,16 @@ EARLY_DIR = (
     / "2026-09-29_pair-columns-and-csv"
     / "files"
 )
+OCT12_EARLY_DIR = (
+    ROOT
+    / "_incoming"
+    / "jim-kelley"
+    / "2026-10-12_ca-ri-broad-denmark"
+    / "files"
+)
+import os as _os
+if _os.environ.get("SARS_OCT12_FILES"):
+    OCT12_EARLY_DIR = Path(_os.environ["SARS_OCT12_FILES"])
 
 # Sheet column "2020-2021 file". NA rows are omitted, so their count stays 0.
 EARLY_BY_CODE = {
@@ -42,7 +52,11 @@ EARLY_BY_CODE = {
     "illumina_hiseq_2500": "UK_hiseq2500_2020-Jul21.txt",
     "nextseq_500": "UK_nextseq500_2020-2021.txt",
     "nextseq_550": "UK_nextseq550_2020-Jul21.txt",
-    "PRJNA622837-Broad_Inst": "Broad-2020-Jul21.txt",
+    "PRJNA622837-Broad_Inst": "Broad-all-2020-Jul21.txt",
+    "PRJNA746690-CA": "PRJNA746690_CA_2020-Jul21.txt",
+    "PRJNA744530-RI": "RI_miseq_2020-Jul21.txt",
+    "Denmark-nextseq550": "Denm_550_2020-Jul21.txt",
+    "PRJEB72496-Denmark-6000": "Denm_6000_2020-Jul21.txt",
     "NJ-PRJNA708324": "NJ_miseq_2020-Jul21.txt",
     "PRJEB46220-Argentina": "Argentina-2020-Jul21.txt",
     "Slovakia_miseq": "Slovakia_2020-2021.txt",
@@ -80,22 +94,39 @@ def read_early_zip(path: Path) -> dict[str, list[str]]:
 
 
 def main() -> None:
-    if not EARLY_ZIP.is_file():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--only", default="", help="Reload these group codes only")
+    args = parser.parse_args()
+    only = [part.strip() for part in args.only.split(",") if part.strip()]
+    lists: dict[str, list[str]] = {}
+    if only:
+        if not OCT12_EARLY_DIR.is_dir() and not EARLY_ZIP.is_file():
+            raise SystemExit("Missing early lists")
+    elif not EARLY_ZIP.is_file():
         raise SystemExit("Missing " + str(EARLY_ZIP))
-    lists = read_early_zip(EARLY_ZIP)
+    if EARLY_ZIP.is_file() and not only:
+        lists = read_early_zip(EARLY_ZIP)
     if EARLY_DIR.is_dir():
         for path in EARLY_DIR.glob("*.txt"):
             lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
+    if OCT12_EARLY_DIR.is_dir():
+        for path in OCT12_EARLY_DIR.glob("*.txt"):
+            lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
+            lists[path.stem] = lists[path.name]
     cfg = parse_connection_php()
     mysql_run(SCHEMA_SQL.read_text(encoding="utf-8"), cfg)
     from import_vcf_nj_reads import mysql_pairs
 
     groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
     for code, filename in EARLY_BY_CODE.items():
+        if only and code not in only:
+            continue
         if code not in groups:
             print("skip", code, "no group row")
             continue
-        ids = lists.get(filename)
+        ids = lists.get(filename) or lists.get(Path(filename).stem)
         if not ids:
             print("skip", code, "missing", filename)
             continue

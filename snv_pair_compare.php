@@ -348,7 +348,7 @@ if (!function_exists('snv_pair_render')) {
      * @param array<string,mixed> $left
      * @param array<string,mixed> $right
      */
-    function snv_pair_render(array $rows, array $group, array $left, array $right, $minAf, $minPercent)
+    function snv_pair_render(array $rows, array $group, array $left, array $right, $minAf, $minPercent, $csvHref = '')
     {
         $leftLabel = (string) $left['label'];
         $rightLabel = (string) $right['label'];
@@ -363,6 +363,9 @@ if (!function_exists('snv_pair_render')) {
         $scope .= snv_pair_left_out_text($leftLabel, $left);
         $scope .= snv_pair_left_out_text($rightLabel, $right);
         $html = '<div style="padding:8px 0 4px;font-size:12px;">' . htmlspecialchars($scope, ENT_QUOTES, 'UTF-8') . '</div>';
+        if ($csvHref !== '') {
+            $html .= '<p style="margin:6px 0;"><a href="' . htmlspecialchars($csvHref, ENT_QUOTES, 'UTF-8') . '">Download this table</a></p>';
+        }
         $html .= '<div class="datagrid"><table class="sortable"><thead><tr class="dark">';
         $html .= '<th>SNV</th>';
         $html .= '<th data-sort-method="number">% SNV in ' . htmlspecialchars($leftLabel, ENT_QUOTES, 'UTF-8') . '</th>';
@@ -616,6 +619,150 @@ if (!function_exists('snv_pair_fetch_calls')) {
     }
 }
 
+if (!function_exists('snv_pair_csv_filename')) {
+    /**
+     * @param array<string,mixed> $group
+     * @param array<string,mixed> $left
+     * @param array<string,mixed> $right
+     */
+    function snv_pair_csv_filename(array $group, array $left, array $right, $minAf, $minSamples)
+    {
+        $safe = function ($value) {
+            $value = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) $value);
+            return trim((string) $value, '_');
+        };
+        $code = isset($group['code']) && (string) $group['code'] !== ''
+            ? (string) $group['code']
+            : (string) $group['label'];
+        $name = 'snv-pairs_' . $safe($code)
+            . '_' . $safe($left['label'])
+            . '_' . $safe($right['label'])
+            . '_minAf' . snv_pair_format_number($minAf)
+            . '_min' . (int) $minSamples;
+
+        return $name . '.csv';
+    }
+}
+
+if (!function_exists('snv_pair_csv_text')) {
+    /**
+     * Same columns and order as the comparison table.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @param array<string,mixed> $group
+     * @param array<string,mixed> $left
+     * @param array<string,mixed> $right
+     */
+    function snv_pair_csv_text(array $rows, array $group, array $left, array $right, $minAf, $minPercent)
+    {
+        $meta = '# SARSNTDB variant-primer SNV comparison'
+            . '; group=' . $group['label']
+            . '; pair1=' . $left['label']
+            . '; n1=' . (int) $left['n']
+            . '; pair2=' . $right['label']
+            . '; n2=' . (int) $right['n']
+            . '; min_af=' . snv_pair_format_number($minAf)
+            . '; min_percent=' . snv_pair_format_number($minPercent)
+            . '; rows=' . count($rows);
+        $lines = [$meta];
+        $lines[] = nj_read_csv_line([
+            'SNV',
+            '% SNV in ' . $left['label'],
+            '% SNV in ' . $right['label'],
+            'Rel. % Diff',
+        ]);
+        foreach ($rows as $row) {
+            $rel = $row['rel'] === null ? '' : snv_pair_format_number($row['rel']);
+            $lines[] = nj_read_csv_line([
+                $row['name'],
+                snv_pair_format_number($row['pct1']),
+                snv_pair_format_number($row['pct2']),
+                $rel,
+            ]);
+        }
+
+        return implode("\n", $lines) . "\n";
+    }
+}
+
+if (!function_exists('snv_pair_csv_href')) {
+    /**
+     * @param array<string,mixed> $pack
+     */
+    function snv_pair_csv_href(array $pack)
+    {
+        return 'SnvPairCompare.php?what=csv'
+            . '&Group=' . rawurlencode((string) $pack['code'])
+            . '&Pair1=' . rawurlencode((string) $pack['key1'])
+            . '&Pair2=' . rawurlencode((string) $pack['key2'])
+            . '&MinAf=' . rawurlencode(snv_pair_format_number($pack['min_af']))
+            . '&MinPercent=' . rawurlencode((string) $pack['min_percent'])
+            . '&MinSamples=' . (int) $pack['min_samples']
+            . '&MergeDelta=' . (!empty($pack['merge_delta']) ? '1' : '0');
+    }
+}
+
+if (!function_exists('snv_pair_export_pack')) {
+    /**
+     * @return array<string,mixed>
+     */
+    function snv_pair_export_pack(mysqli $con)
+    {
+        $code = isset($_GET['Group']) ? trim((string) $_GET['Group']) : '';
+        if ($code === '' || $code === 'original') {
+            return ['error' => 'Pick a VCF group. Original has no variant or primer calls.'];
+        }
+        $group = vcf_snv_group_row($con, $code);
+        if ($group === null) {
+            return ['error' => 'That group is not available.'];
+        }
+        $options = snv_pair_request_options();
+        $built = snv_pair_build(snv_pair_fetch_samples($con, $group), $options);
+        $key1 = isset($_GET['Pair1']) ? (string) $_GET['Pair1'] : '';
+        $key2 = isset($_GET['Pair2']) ? (string) $_GET['Pair2'] : '';
+        if ($key1 === '' || $key2 === '') {
+            return ['error' => 'Pick two pairs.'];
+        }
+        if ($key1 === $key2) {
+            return ['error' => 'Pick two different pairs.'];
+        }
+        $left = snv_pair_find($built, $key1);
+        $right = snv_pair_find($built, $key2);
+        if ($left === null || $right === null) {
+            return ['error' => 'One of those pairs is not in this group.'];
+        }
+        $min = (int) $options['min_samples'];
+        if (empty($left['ready']) || empty($right['ready'])) {
+            $bits = [];
+            if (empty($left['ready'])) {
+                $bits[] = snv_pair_unready_text($left, $min);
+            }
+            if (empty($right['ready'])) {
+                $bits[] = snv_pair_unready_text($right, $min);
+            }
+
+            return ['error' => implode(' ', $bits)];
+        }
+        $minAf = snv_pair_request_min_af();
+        $minPercent = snv_pair_request_min_percent();
+        $calls = snv_pair_fetch_calls($con, (int) $group['id'], $left['ids'], $right['ids'], $minAf);
+
+        return [
+            'code' => $code,
+            'group' => $group,
+            'left' => $left,
+            'right' => $right,
+            'key1' => $key1,
+            'key2' => $key2,
+            'min_af' => $minAf,
+            'min_percent' => $minPercent,
+            'min_samples' => $min,
+            'merge_delta' => !empty($options['merge_delta']),
+            'rows' => snv_pair_compare_rows($calls, $left['n'], $right['n'], $minPercent),
+        ];
+    }
+}
+
 if (!function_exists('snv_pair_choices_payload')) {
     /**
      * @return array{choices:list<array<string,mixed>>,pair1:string,pair2:string}
@@ -649,46 +796,19 @@ if (!function_exists('snv_pair_choices_payload')) {
 if (!function_exists('snv_pair_table_html')) {
     function snv_pair_table_html(mysqli $con)
     {
-        $code = isset($_GET['Group']) ? trim((string) $_GET['Group']) : '';
-        if ($code === '' || $code === 'original') {
-            return snv_pair_note('Pick a VCF group. Original has no variant or primer calls.');
+        $pack = snv_pair_export_pack($con);
+        if (isset($pack['error'])) {
+            return snv_pair_note($pack['error']);
         }
-        $group = vcf_snv_group_row($con, $code);
-        if ($group === null) {
-            return snv_pair_note('That group is not available.');
-        }
-        $options = snv_pair_request_options();
-        $built = snv_pair_build(snv_pair_fetch_samples($con, $group), $options);
-        $key1 = isset($_GET['Pair1']) ? (string) $_GET['Pair1'] : '';
-        $key2 = isset($_GET['Pair2']) ? (string) $_GET['Pair2'] : '';
-        if ($key1 === '' || $key2 === '') {
-            return snv_pair_note('Pick two pairs.');
-        }
-        if ($key1 === $key2) {
-            return snv_pair_note('Pick two different pairs.');
-        }
-        $left = snv_pair_find($built, $key1);
-        $right = snv_pair_find($built, $key2);
-        if ($left === null || $right === null) {
-            return snv_pair_note('One of those pairs is not in this group.');
-        }
-        $min = (int) $options['min_samples'];
-        if (empty($left['ready']) || empty($right['ready'])) {
-            $bits = [];
-            if (empty($left['ready'])) {
-                $bits[] = snv_pair_unready_text($left, $min);
-            }
-            if (empty($right['ready'])) {
-                $bits[] = snv_pair_unready_text($right, $min);
-            }
 
-            return snv_pair_note(implode(' ', $bits));
-        }
-        $minAf = snv_pair_request_min_af();
-        $minPercent = snv_pair_request_min_percent();
-        $calls = snv_pair_fetch_calls($con, (int) $group['id'], $left['ids'], $right['ids'], $minAf);
-        $rows = snv_pair_compare_rows($calls, $left['n'], $right['n'], $minPercent);
-
-        return snv_pair_render($rows, $group, $left, $right, $minAf, $minPercent);
+        return snv_pair_render(
+            $pack['rows'],
+            $pack['group'],
+            $pack['left'],
+            $pack['right'],
+            $pack['min_af'],
+            $pack['min_percent'],
+            snv_pair_csv_href($pack)
+        );
     }
 }

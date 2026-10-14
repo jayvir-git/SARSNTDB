@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from import_vcf_early_samples import EARLY_BY_CODE, ids_in_text
-from import_vcf_sample_metadata import GROUP_PROJECT, ISOLATED_GROUPS, SKIP_PROJECTS, build_rows, decide_eligibility
+from import_vcf_sample_metadata import GROUP_PROJECT, ISOLATED_GROUPS, SKIP_PROJECTS, build_rows, decide_eligibility, projects_for
 
 
 def test_decide():
@@ -20,13 +20,19 @@ def test_skip_isolated():
     assert "PRJNA622837" not in SKIP_PROJECTS
     assert "PRJEB47340" not in SKIP_PROJECTS
     assert ISOLATED_GROUPS == ()
-    assert GROUP_PROJECT["PRJNA622837-Broad_Inst"] == "PRJNA622837"
+    assert projects_for("PRJNA622837-Broad_Inst") == ("PRJNA622837", "PRJNA715749")
+    assert projects_for("Denmark-nextseq550") == ("PRJEB49401", "PRJEB72496")
+    assert projects_for("PRJNA746690-CA") == ("PRJNA746690",)
     assert GROUP_PROJECT["PRJEB46220-Argentina"] == "PRJEB46220"
     assert GROUP_PROJECT["Port-PRJEB47340"] == "PRJEB47340"
     assert GROUP_PROJECT["S_Afr-PRJNA636748"] == "PRJNA636748"
     assert GROUP_PROJECT["Angola_miseq"] == "PRJNA717113"
     assert GROUP_PROJECT["Botswana"] == "PRJNA782796"
     assert GROUP_PROJECT["Slovakia_miseq"] == "PRJEB45305"
+    assert projects_for("illumina_hiseq_2500") == ("PRJEB37886",)
+    assert projects_for("Est-mix") == ("Estonia",)
+    assert EARLY_BY_CODE["illumina_hiseq_2500"] == "UK_hiseq2500_2020-Jul21.txt"
+    assert "Est-mix" not in EARLY_BY_CODE
 
 
 def test_build_rows_match_by_id_not_project():
@@ -71,6 +77,8 @@ def test_build_rows_match_by_id_not_project():
 
 def test_early_lists():
     assert ids_in_text("SRR1\n\n# note\nSRR1\nSRR2\n") == ["SRR1", "SRR2"]
+    assert EARLY_BY_CODE["PRJNA622837-Broad_Inst"] == "Broad-all-2020-Jul21.txt"
+    assert EARLY_BY_CODE["Denmark-nextseq550"] == "Denm_550_2020-Jul21.txt"
     assert EARLY_BY_CODE["Angola_miseq"] == "Angola_miseq-2020-Jul21.txt"
     assert EARLY_BY_CODE["Slovakia_miseq"] == "Slovakia_2020-2021.txt"
     assert "LA-PRJNA815364" not in EARLY_BY_CODE

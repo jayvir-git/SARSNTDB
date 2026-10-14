@@ -10,6 +10,7 @@ from import_vcf_snv_groups import (
     collect_group_sources,
     group_code_from_stem,
     group_label,
+    iter_vcf_from_zip,
     load_list_file,
     parse_vcf_lines,
     sample_allowed,
@@ -59,7 +60,7 @@ def test_nj_merge_and_labels():
     assert group_code_from_stem("Port_8-10-bwa-pad") == "Port-PRJEB47340"
     assert group_code_from_stem("Port_11-12-bwa-pad") == "Port-PRJEB47340"
     assert group_label("NJ-PRJNA708324") == "USA NJ PRJNA708324"
-    assert group_label("PRJNA622837-Broad_Inst") == "USA NE, NJ PRJNA622837"
+    assert group_label("PRJNA622837-Broad_Inst") == "USA NE, NJ NovaSeq 6000 PRJNA622837 and PRJNA715749"
     assert group_label("LA-PRJNA815364") == "USA LA PRJNA815364"
     assert group_label("PRJEB46220-Argentina") == "Argentina PRJEB46220"
     assert group_label("S_Afr-PRJNA636748") == "South Africa MiSeq"
@@ -140,6 +141,16 @@ def test_zip_roundtrip(tmp_path: Path):
     assert rows[0][0] == 21
 
 
+def test_zero_byte_vcf_is_skipped(tmp_path: Path):
+    zpath = tmp_path / "illumina_hiseq_2500-bwa-pad.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("empty/ERR1_pad-bwa.SNV.vcf", b"")
+        zf.writestr("ok/ERR2_pad-bwa.SNV.vcf", MEETING_VCF)
+    names = [name for name, _lines in iter_vcf_from_zip(zpath)]
+    assert all("ERR1" not in name for name in names)
+    assert any("ERR2" in name for name in names)
+
+
 if __name__ == "__main__":
     testdir = Path(__file__).resolve().parent / "_tmp_vcf_test"
     testdir.mkdir(exist_ok=True)
@@ -152,4 +163,5 @@ if __name__ == "__main__":
     test_keep_first_duplicate(merge_dir)
     test_list_file(testdir)
     test_zip_roundtrip(testdir)
+    test_zero_byte_vcf_is_skipped(testdir)
     print("import_vcf_snv_groups parse assertions passed")

@@ -34,11 +34,17 @@ GROUP_PROJECT = {
     "LA-PRJNA815364_nextseq500": "PRJNA815364",
     "NJ-PRJNA708324": "PRJNA708324",
     "illumina_miseq": "PRJEB37886",
+    "illumina_hiseq_2500": "PRJEB37886",
     "nextseq_500": "PRJEB37886",
     "nextseq_550": "PRJEB37886",
+    "Est-mix": "Estonia",
     "S_Afr-PRJNA636748": "PRJNA636748",
     "Port-PRJEB47340": "PRJEB47340",
-    "PRJNA622837-Broad_Inst": "PRJNA622837",
+    "PRJNA622837-Broad_Inst": ("PRJNA622837", "PRJNA715749"),
+    "PRJNA746690-CA": "PRJNA746690",
+    "PRJNA744530-RI": "PRJNA744530",
+    "Denmark-nextseq550": ("PRJEB49401", "PRJEB72496"),
+    "PRJEB72496-Denmark-6000": "PRJEB72496",
     "PRJEB46220-Argentina": "PRJEB46220",
     "India-miseq": "PRJNA625669",
     "Port_miseq": "PRJEB47340",
@@ -78,7 +84,11 @@ SKIP_PROJECTS = set()
 
 DISPLAY_LABELS = {
     "NJ-PRJNA708324": "USA NJ PRJNA708324",
-    "PRJNA622837-Broad_Inst": "USA NE, NJ PRJNA622837",
+    "PRJNA622837-Broad_Inst": "USA NE, NJ NovaSeq 6000 PRJNA622837 and PRJNA715749",
+    "PRJNA746690-CA": "USA CA MiSeq PRJNA746690",
+    "PRJNA744530-RI": "USA RI MiSeq PRJNA744530",
+    "Denmark-nextseq550": "Denmark NextSeq 550 PRJEB49401 and PRJEB72496",
+    "PRJEB72496-Denmark-6000": "Denmark NovaSeq 6000 PRJEB72496",
     "LA-PRJNA815364": "USA LA MiSeq PRJNA815364",
     "LA-PRJNA815364_nextseq500": "USA LA NextSeq 500 PRJNA815364",
     "PRJEB46220-Argentina": "Argentina PRJEB46220",
@@ -89,7 +99,34 @@ DISPLAY_LABELS = {
     "VA": "USA VA MiSeq PRJNA625551",
     "Austr-PRJNA613958_nextseq500": "Australia NextSeq 500 PRJNA613958",
     "Austr-PRJNA613958_nextseq550": "Australia NextSeq 550 PRJNA613958",
+    "illumina_hiseq_2500": "United Kingdom HiSeq 2500 PRJEB37886",
+    "Est-mix": "Estonia many #s",
 }
+
+OCT12_META_DIR = (
+    ROOT / "_incoming" / "jim-kelley" / "2026-10-12_ca-ri-broad-denmark" / "files"
+)
+import os as _os
+if _os.environ.get("SARS_OCT12_FILES"):
+    OCT12_META_DIR = Path(_os.environ["SARS_OCT12_FILES"])
+OCT12_META_FILES = {
+    "run_metadata.v05-PRJNA746690.csv": "PRJNA746690",
+    "run_metadata.v05-PRJNA744530.csv": "PRJNA744530",
+    "run_metadata.v05-PRJEB49401.csv": "PRJEB49401",
+    "run_metadata.v05-PRJEB72496.csv": "PRJEB72496",
+    "run_metadata.v05-PRJNA715749.csv": "PRJNA715749",
+    "run_metadata.v05-PRJNA622837.csv": "PRJNA622837",
+    "run_metadata.v05-PRJEB37886.csv": "PRJEB37886",
+    "run_metadata_Estonia_primers.csv": "Estonia",
+}
+
+
+def projects_for(code: str) -> tuple[str, ...]:
+    value = GROUP_PROJECT[code]
+    if isinstance(value, str):
+        return (value,)
+    return tuple(value)
+
 
 SEP24_META_FILES = [
     ("Variant_primer_data/run_metadata.v05-PRJNA656534.csv", "PRJNA656534"),
@@ -170,6 +207,8 @@ def absorb_metadata_rows(hits: dict[str, dict[str, str]], reader, project: str, 
 def stream_metadata(wanted_names: set[str]) -> dict[str, dict[str, str]]:
     """sample_name -> {project, variant, primer, qc, source} for IDs we have VCFs for."""
     hits: dict[str, dict[str, str]] = {}
+    if not META_ZIP.is_file():
+        return _stream_oct12(hits, wanted_names)
     with zipfile.ZipFile(META_ZIP) as zf:
         for inner in zf.namelist():
             if not inner.lower().endswith(".csv"):
@@ -211,6 +250,17 @@ def stream_metadata(wanted_names: set[str]) -> dict[str, dict[str, str]]:
                         Path(inner).name,
                         wanted_names,
                     )
+    return _stream_oct12(hits, wanted_names)
+
+
+def _stream_oct12(hits: dict[str, dict[str, str]], wanted_names: set[str]) -> dict[str, dict[str, str]]:
+    if OCT12_META_DIR.is_dir():
+        for path in OCT12_META_DIR.glob("*.csv"):
+            project = OCT12_META_FILES.get(path.name)
+            if project is None:
+                continue
+            with path.open(newline="", encoding="utf-8", errors="replace") as fh:
+                absorb_metadata_rows(hits, csv.reader(fh), project, path.name, wanted_names)
     return hits
 
 
@@ -237,9 +287,9 @@ def build_rows(
     for name, copies in vcf_by_name.items():
         meta = meta_by_name.get(name)
         for sample_id, group_id, code in copies:
-            expected_project = GROUP_PROJECT[code]
+            expected_projects = projects_for(code)
             qc = None
-            if meta is not None and meta["project"] == expected_project:
+            if meta is not None and meta["project"] in expected_projects:
                 qc = meta["qc"]
                 b = bucket(code)
                 b["vcf"] += 1
@@ -362,7 +412,7 @@ def main() -> None:
     unknown = [code for code in only if code not in GROUP_PROJECT]
     if unknown:
         raise SystemExit("Unknown group " + ", ".join(unknown))
-    if not META_ZIP.is_file():
+    if not META_ZIP.is_file() and not OCT12_META_DIR.is_dir():
         raise SystemExit("Missing " + str(META_ZIP))
     cfg = parse_connection_php()
     vcf_by_name = load_vcf_samples(cfg)

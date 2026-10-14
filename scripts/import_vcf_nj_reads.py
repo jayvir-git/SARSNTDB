@@ -41,6 +41,11 @@ NJ_BASES = [
     ("Estonia_mix_", "Est-mix"),
     ("India-miseq_", "India-miseq"),
     ("Port_miseq_", "Port_miseq"),
+    ("Broad_all_uniq_1012_", "PRJNA622837-Broad_Inst"),
+    ("Denmark_nextseq_550_", "Denmark-nextseq550"),
+    ("PRJEB72496-Denm-6000_", "PRJEB72496-Denmark-6000"),
+    ("PRJNA746690-CA_", "PRJNA746690-CA"),
+    ("PRJNA744530-RI_", "PRJNA744530-RI"),
     ("Broad_6000_", "PRJNA622837-Broad_Inst"),
     ("Port_0-12_", "Port-PRJEB47340"),
     ("Ang_miseq_", "Angola_miseq"),
@@ -61,6 +66,11 @@ LIST_FILES = {
     "Argentina_all_unique_csv.txt": "PRJEB46220-Argentina",
     "Botswana_unique_csv.txt": "Botswana",
     "Broad_unique_csv.txt": "PRJNA622837-Broad_Inst",
+    "Broad_all_uniq_1012_csv.txt": "PRJNA622837-Broad_Inst",
+    "PRJNA746690-CA_unique_csv.txt": "PRJNA746690-CA",
+    "PRJNA744530-RI_unique_csv.txt": "PRJNA744530-RI",
+    "Denmark_nextseq_550_unique_csv.txt": "Denmark-nextseq550",
+    "PRJEB72496-Denmark_6000_unique_csv.txt": "PRJEB72496-Denmark-6000",
     "Est_mix_unique_csv.txt": "Est-mix",
     "India-miseq_unique_csv.txt": "India-miseq",
     "India_6000_all_unique_csv.txt": "India-6000",
@@ -344,7 +354,11 @@ def sra_ids_from_csv(path: Path) -> list[str]:
     return ids
 
 
-def load_only(codes: list[str]) -> None:
+def load_only(
+    codes: list[str],
+    nj_roots: list[Path] | None = None,
+    list_roots: list[Path] | None = None,
+) -> None:
     """Reload NJ reads, sample list, and SRA for these groups only."""
     global ALLOWED
     cfg = parse_connection_php()
@@ -356,7 +370,19 @@ def load_only(codes: list[str]) -> None:
         ALLOWED.add((int(size), tag))
 
     list_ids: dict[str, list[str]] = {}
-    if SLOVAKIA_LIST_ZIP.is_file():
+    extra_lists = list_roots or []
+    for list_root in extra_lists:
+        for path in find_files(list_root):
+            code = LIST_FILES.get(path.name)
+            if code is None or code not in codes:
+                continue
+            ids = []
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                sample = sample_id_from_list_line(line)
+                if sample:
+                    ids.append(sample)
+            list_ids[code] = ids
+    if not extra_lists and SLOVAKIA_LIST_ZIP.is_file():
         with zipfile.ZipFile(SLOVAKIA_LIST_ZIP) as zf:
             for info in zf.infolist():
                 code = LIST_FILES.get(Path(info.filename).name)
@@ -366,16 +392,17 @@ def load_only(codes: list[str]) -> None:
                 list_ids[code] = [
                     sample_id_from_list_line(line) for line in text.splitlines() if sample_id_from_list_line(line)
                 ]
-    for path in find_files(DRIVE / "sample_lists"):
-        code = LIST_FILES.get(path.name)
-        if code is None or code not in codes:
-            continue
-        ids = []
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            sample = sample_id_from_list_line(line)
-            if sample:
-                ids.append(sample)
-        list_ids[code] = ids
+    if not extra_lists:
+        for path in find_files(DRIVE / "sample_lists"):
+            code = LIST_FILES.get(path.name)
+            if code is None or code not in codes:
+                continue
+            ids = []
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                sample = sample_id_from_list_line(line)
+                if sample:
+                    ids.append(sample)
+            list_ids[code] = ids
 
     for code in codes:
         if code not in groups:
@@ -399,9 +426,12 @@ def load_only(codes: list[str]) -> None:
                 insert_values("vcf_snv_sra_sample", "group_id,sample_name", batch, cfg)
             print(f"sra {code} {len(sra)}")
 
-    roots = [DRIVE / "nj"]
-    if SLOVAKIA_NJ_ZIP.is_file():
-        roots.append(SLOVAKIA_NJ_ZIP.parent)
+    if nj_roots:
+        roots = list(nj_roots)
+    else:
+        roots = [DRIVE / "nj"]
+        if SLOVAKIA_NJ_ZIP.is_file():
+            roots.append(SLOVAKIA_NJ_ZIP.parent)
     pending: list[str] = []
     read_counts: dict[str, int] = {}
     wanted = set(codes)
@@ -453,9 +483,15 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="", help="Reload these group codes only")
+    parser.add_argument("--nj-root", type=Path, action="append", default=None)
+    parser.add_argument("--list-root", type=Path, action="append", default=None)
     args = parser.parse_args()
     if args.only.strip():
-        load_only([part.strip() for part in args.only.split(",") if part.strip()])
+        load_only(
+            [part.strip() for part in args.only.split(",") if part.strip()],
+            nj_roots=args.nj_root,
+            list_roots=args.list_root,
+        )
         return
     cfg = parse_connection_php()
     mysql_run(SCHEMA_SQL.read_text(encoding="utf-8"), cfg)
