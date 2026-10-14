@@ -419,6 +419,7 @@ if (!function_exists('tsg_json_for_script')) {
 }
 
 if (!function_exists('tsg_is_illustrative_junction')) {
+    // Illustrative seed rows stay hidden; keep them out of junction tables and screenshots (D-60).
     function tsg_is_illustrative_junction($row)
     {
         $name = isset($row['name']) ? (string) $row['name'] : '';
@@ -431,7 +432,7 @@ if (!function_exists('tsg_is_illustrative_junction')) {
 
 if (!function_exists('tsg_repeat_for_display')) {
     /**
-     * Repeats are shown as DNA: capitals, with U written as T.
+     * Repeats are shown as DNA: capitals, with U written as T (D-60).
      */
     function tsg_repeat_for_display($seq)
     {

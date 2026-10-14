@@ -3,6 +3,7 @@
  * Query groups / variants / primers for a junction (Jim Kelley prototype).
  * Data: sql/junction_query.sql + sql/junction_viridian_counts.sql
  * Reverse: sql/junction_query_drop.sql
+ * NJ (non-canonical junction) data is unpublished: never expose it on a public host or in screenshots outside the lab (D-17).
  */
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/junction_query_helpers.php';

@@ -174,6 +174,7 @@
     return arrowTopForLane(lane) + ARROW_HEIGHT / 2;
   }
 
+  // LEFT points right, RIGHT points left (reverse complement); some BED files lack strand, so the name wins (D-10).
   function isLeftPrimer(primer) {
     var name = String(primer.primer_name || '');
     if (/RIGHT/i.test(name)) {

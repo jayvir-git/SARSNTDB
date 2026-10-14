@@ -1,6 +1,7 @@
 <?php
 /**
  * Two-segment genomic structures — table + schematic view (sgmRNA first subtype).
+ * NJ (non-canonical junction) data is unpublished: never expose it on a public host or in screenshots outside the lab (D-17).
  */
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/two_segment_helpers.php';
@@ -9,7 +10,7 @@ require_once __DIR__ . '/snv_pango_helpers.php';
 $rows = [];
 $dbError = null;
 $primerDbError = null;
-$primerWindow = 800;
+$primerWindow = 800; // ±800 nt so a Midnight pair (about 1,120 bp apart) is usually visible (D-13).
 $primerSchemes = [];
 $selectedPrimerSchemes = [];
 $selectedSchemeCodes = [];

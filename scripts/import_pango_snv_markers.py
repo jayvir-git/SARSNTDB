@@ -25,7 +25,7 @@ OUT_DROP_SQL = ROOT / "sql" / "snv_pango_marker_drop.sql"
 OUT_INDEL_SQL = ROOT / "sql" / "pango_indel_marker.sql"
 OUT_INDEL_DROP_SQL = ROOT / "sql" / "pango_indel_marker_drop.sql"
 
-RATIO_LT = 0.2
+RATIO_LT = 0.2  # Strict < 0.2 (D-20); whether 0.2 itself counts is unconfirmed.
 
 
 def sql_str(value: object | None) -> str:
