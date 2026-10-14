@@ -10,6 +10,8 @@ require_once __DIR__ . '/nj_read_helpers.php';
 
 if (!function_exists('snv_pair_rel_diff')) {
     /**
+     * Rel. % Diff = |a - b| / mean(a, b), unsigned (D-62).
+     *
      * @param float|int $left
      * @param float|int $right
      * @return float|null

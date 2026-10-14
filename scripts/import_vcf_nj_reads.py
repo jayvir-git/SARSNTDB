@@ -22,6 +22,7 @@ from import_vcf_snv_groups import mysql_run, parse_connection_php, sql_str
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_nj.sql"
 DRIVE = ROOT / "_incoming" / "jim-kelley" / "2026-09-22_nj-reads-many-projects" / "drive"
+# Reads the gitignored packet copy of the catalog; moving that packet breaks the import silently.
 CATALOG = ROOT / "_incoming" / "jim-kelley" / "2026-09-23_nj-on-junction-page" / "files" / "NJ-table_no_types.csv"
 # (nj_size, coord_tag) rows the catalog accepts. Empty means tests accept simple files only.
 ALLOWED: set[tuple[int, str]] = set()
@@ -133,6 +134,7 @@ def sample_id_from_list_line(line: str) -> str:
 def parse_coord_name(filename: str) -> tuple[str, int, str] | None:
     """Return (group code, size, coord tag). Tag is '' or the start on a duplicate size."""
     name = Path(filename.replace("\\", "/")).name
+    # _coord1 files are skipped; a start-tagged file of a shared size loads only if the catalog lists it (D-39, D-44).
     if name.endswith("_coord1.csv"):
         return None
     for base, code in NJ_BASES:

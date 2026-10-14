@@ -25,6 +25,7 @@ if (!function_exists('vcf_snv_eligibility_tables_exist')) {
 if (!function_exists('vcf_snv_hide_non_workbook_groups')) {
     /**
      * Temporary Sep 17 display restriction. Flip to false to restore hidden groups.
+     * Hide, never delete (D-34).
      */
     function vcf_snv_hide_non_workbook_groups()
     {
@@ -156,6 +157,7 @@ if (!function_exists('vcf_snv_group_is_isolated')) {
 if (!function_exists('vcf_snv_eligibility_reason')) {
     /**
      * Future sample filters should AND extra reasons here, not replace this rule.
+     * Eligible = QC PASS and has a VCF, by sample ID; never the workbook "# Analyzed" (D-33).
      *
      * @param string|null $qc
      */
@@ -186,6 +188,7 @@ if (!function_exists('vcf_snv_sample_is_eligible')) {
 }
 
 if (!function_exists('vcf_snv_default_group_code')) {
+    // USA NJ on first open is intentional (D-58).
     function vcf_snv_default_group_code()
     {
         return 'NJ-PRJNA708324';

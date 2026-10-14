@@ -77,7 +77,7 @@ if (!function_exists('mutations_detail_display_protein')) {
         $hasGene = isset($row['Start']) && $row['Start'] !== null && $row['Start'] !== ''
             && isset($row['RNA_sequence']) && $row['RNA_sequence'] !== null && $row['RNA_sequence'] !== '';
         if (!$hasGene && (!isset($row['protein']) || $row['protein'] === null || $row['protein'] === '')) {
-            return '-';
+            return '-'; // Hyphen, not an em dash: exported CSVs are parsed in Python (D-42).
         }
         return (string) $row['protein'];
     }

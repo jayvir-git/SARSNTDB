@@ -65,6 +65,7 @@ if (!function_exists('nj_read_request_flag')) {
 }
 
 if (!function_exists('nj_read_request_min_samples')) {
+    // Default 30 is deliberate even though users often lower it (D-47, D-59).
     function nj_read_request_min_samples()
     {
         if (!isset($_GET['MinSamples']) || trim((string) $_GET['MinSamples']) === '') {
@@ -123,6 +124,7 @@ if (!function_exists('nj_read_request_keep')) {
 if (!function_exists('nj_read_variant_bucket')) {
     /**
      * Null drops no-call, Unassigned, and Probable labels.
+     * BA.1 is its own bucket and is never merged (D-48).
      */
     function nj_read_variant_bucket($label)
     {
@@ -174,6 +176,7 @@ if (!function_exists('nj_read_group_type')) {
      * Alpha or Delta plus BA.2–5 or XBB is LTG. Both of those later groups make it long LTG.
      * BA.2–5 and XBB with no Alpha or Delta is long Omi+. One of them alone is Omi+.
      * BA.1 never creates LTG or Omi+.
+     * Labels and the "Omi" spelling are fixed terms (D-50).
      *
      * @param array<string,int> $variantCounts
      */
@@ -708,6 +711,7 @@ if (!function_exists('nj_read_pair_filter_columns')) {
      * Unchecked Merge BA.2–5 shows BA.2 and BA.5. Checked shows BA.2–5.
      * The filter table passes no selected list, so every primer column stays.
      * A shorter selected-pair list drops columns that were cleared.
+     * The filter table must keep every column; coupling it to the checklist was reverted (D-56).
      *
      * @param array<string,mixed> $options
      * @param list<string>|null $selectedKeys
@@ -884,6 +888,7 @@ if (!function_exists('nj_read_filter_table')) {
 if (!function_exists('nj_read_group_file_abbrev')) {
     /**
      * Short download name. The groups sheet has no abbreviation column.
+     * Tokens appear in files users already saved; renaming one breaks their records (D-57).
      */
     function nj_read_group_file_abbrev($code)
     {
@@ -948,6 +953,7 @@ if (!function_exists('nj_read_download_group_token')) {
 if (!function_exists('nj_read_junction_download_name')) {
     /**
      * A second junction of the same size keeps its start in the name (2766_1883).
+     * Names must never collide (D-57).
      *
      * @param list<string> $codes
      */

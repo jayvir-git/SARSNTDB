@@ -31,9 +31,9 @@ SEP17_SNV_ZIP = (
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_groups.sql"
 DROP_SQL = ROOT / "sql" / "vcf_snv_groups_drop.sql"
 CONNECTION_PHP = ROOT / "connection.php"
-MYSQL_EXE = Path(r"C:\xampp\mysql\bin\mysql.exe")
+MYSQL_EXE = Path(r"C:\xampp\mysql\bin\mysql.exe")  # Local XAMPP; elsewhere falls back to "mysql" on PATH.
 
-PAD = 6000
+PAD = 6000  # GROM output is padded 6000 nt each side; POS - 6000 is the genome coordinate (D-27).
 GENOME_MAX = 29903
 BASES = set("ACGT")
 SAMPLE_NAME_RE = re.compile(r"^(?P<name>.+)_pad-bwa\.SNV\.vcf$", re.IGNORECASE)
@@ -153,6 +153,7 @@ def sample_allowed(sample_name: str, allowed: set[str] | None) -> bool:
 def parse_af(fmt: str, sample: str) -> float | None:
     keys = fmt.split(":")
     vals = sample.split(":")
+    # Read AF by FORMAT key; field 2 of GT:PR:AF is only the fallback (D-27).
     if "AF" in keys:
         idx = keys.index("AF")
     elif len(vals) > 2:
@@ -203,7 +204,7 @@ def iter_vcf_from_zip(zip_path: Path):
             name = info.filename.replace("\\", "/")
             if not name.lower().endswith(".vcf"):
                 continue
-            # A 0-byte VCF means that sample does not exist.
+            # A 0-byte VCF means that sample does not exist (D-64).
             if info.file_size == 0:
                 continue
             with zf.open(info) as handle:

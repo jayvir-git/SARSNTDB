@@ -287,6 +287,7 @@ if (!function_exists('nj_read_table_rows')) {
 }
 
 if (!function_exists('nj_read_variant_is_hidden')) {
+    // Unassigned and Probable labels are dropped (D-45).
     function nj_read_variant_is_hidden($label)
     {
         $label = (string) $label;
@@ -677,6 +678,7 @@ if (!function_exists('nj_read_fold_breakdown')) {
 }
 
 if (!function_exists('nj_read_breakdown_display')) {
+    // -1 means some samples but under the minimum; 0 means truly none. Keep them distinct (D-47).
     function nj_read_breakdown_display($numerator, $denominator, $minSamples = 0, $showBelow = false)
     {
         $denominator = (int) $denominator;
@@ -913,6 +915,7 @@ if (!function_exists('nj_read_early_counts')) {
     /**
      * Early is a 2020–2021 list sample whose variant is "." or blank.
      * A group with no list contributes nothing. "." off the list is ignored.
+     * Defined term (D-54): counting every "." sample was tried and reverted.
      *
      * @return array<int,int>
      */

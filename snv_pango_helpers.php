@@ -469,7 +469,7 @@ if (!function_exists('pango_overlay_markers')) {
 if (!function_exists('snv_overlay_variants')) {
     /**
      * SNVs from John's Original `mutations` table at or above the Detail frequency floor.
-     * Not the selected VCF group. Email said "<= 1%" but the 23202 test is ~8%.
+     * Not the selected VCF group. Email said "<= 1%" but the 23202 test is ~8% (D-23).
      *
      * @return list<array{coordinate:int,reference:string,alternate:string,label:string,source:string,source_label:string}>
      */

@@ -22,5 +22,6 @@ if ($con->connect_errno) {
     echo "Failed to connect to MySQL: (" . $con->connect_errno . ") " . $con->connect_error;
 } elseif ($con instanceof mysqli) {
     mysqli_report(MYSQLI_REPORT_OFF);
+    // Required on the Linux server: the latin1 default breaks JSON and primer pages (D-66).
     $con->set_charset('utf8mb4');
 }
