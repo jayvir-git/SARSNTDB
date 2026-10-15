@@ -593,10 +593,12 @@
                 function mutClick() {
                   var start = parsedData[0].cov2Start;
                   var end = parsedData[0].cov2End; 
-                  localStorage.setItem("start",start);
-                  localStorage.setItem("end",end);
+                  try {
+                    localStorage.setItem("start",start);
+                    localStorage.setItem("end",end);
+                  } catch (eStorage) {}
                   
-                  document.location.href = './MutationSearch.php';
+                  document.location.href = './MutationsSearch.php';
                   
                 }
                  

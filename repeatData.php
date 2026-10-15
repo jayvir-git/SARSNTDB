@@ -11,9 +11,27 @@
         // echo ($repeat);
     }
     
+    // Filters are bound as parameters, never pasted into the SQL (Q-27).
     $q1 = "";
+    $q1params = array();
     if($repeat != "") {
-      $q1 .= " AND r.sequence = '" . $repeat . "'";
+      $q1 .= " AND r.sequence = ?";
+      $q1params[] = $repeat;
+    }
+
+    // Runs $sql with string parameters; returns the result or false, like query().
+    function repeatDataQuery($con, $sql, $params) {
+      $stmt = $con->prepare($sql);
+      if (!$stmt) {
+        return false;
+      }
+      if ($params) {
+        $stmt->bind_param(str_repeat('s', count($params)), ...$params);
+      }
+      if (!$stmt->execute()) {
+        return false;
+      }
+      return $stmt->get_result();
     }
 
 
@@ -29,13 +47,13 @@
     FROM
         repeats r where 1=1 $q1";
 
-    $result = $con->query($sql);
+    $result = repeatDataQuery($con, $sql, $q1params);
     // echo gettype($result);
     // echo($sql);
     if (!$result || mysqli_num_rows($result)==0) {
       
       // if repeat not in UGene database then look for repeats LIKE it (containging it)
-      $q1 = " AND r.sequence LIKE '%".$repeat."%'";
+      $q1 = " AND r.sequence LIKE ?";
       $sql = "  SELECT 
       r.sequence,
       r.coord,
@@ -44,7 +62,7 @@
       FROM
           repeats r where 1=1 $q1";
 
-      $result = $con->query($sql);
+      $result = repeatDataQuery($con, $sql, array('%' . $repeat . '%'));
       $substringBoo =true;
       if (!$result || mysqli_num_rows($result)==0) {
         $obj-> coordinates= array(0);

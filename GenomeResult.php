@@ -62,6 +62,39 @@ session_start();
     $q3 = "";
     $protSelected = false;
     $q4 = "";
+    // URL values are bound as parameters, never pasted into the SQL (Q-27).
+    // Each $qN has a matching $qNtypes/$qNparams; values that were unquoted
+    // in the SQL stay numeric ('d') so varchar columns still compare as numbers.
+    $q1types = $q2types = $q3types = $q4types = "";
+    $q1params = $q2params = $q3params = $q4params = array();
+
+    // Adds one parameter: 's' keeps the old quoted-string comparison,
+    // 'n' keeps the old unquoted numeric one.
+    function grParam(&$types, &$params, $kind, $value) {
+      if ($kind === 'n' && is_numeric($value)) {
+        $types .= 'd';
+        $params[] = (float) $value;
+      } else {
+        $types .= 's';
+        $params[] = (string) $value;
+      }
+    }
+
+    // Runs $sql with its bound parameters; returns the result or false, like query().
+    function grQuery($con, $sql, $types, $params) {
+      if ($types === "") {
+        return $con->query($sql);
+      }
+      $stmt = $con->prepare($sql);
+      if (!$stmt) {
+        return false;
+      }
+      $stmt->bind_param($types, ...$params);
+      if (!$stmt->execute()) {
+        return false;
+      }
+      return $stmt->get_result();
+    }
     
     // Function to check if a string is a DNA sequence
     function isDNASequence($str) {
@@ -171,8 +204,10 @@ session_start();
       }
       // echo gettype($tmp_prot);
       // print_r($tmp_prot);
-      $q1 .= " AND gene_1.Protein = '" . $protein . "'";
-      $q2 .= " AND cov_comp.gene = '" . $tmp_prot . "'";
+      $q1 .= " AND gene_1.Protein = ?";
+      grParam($q1types, $q1params, 's', $protein);
+      $q2 .= " AND cov_comp.gene = ?";
+      grParam($q2types, $q2params, 's', $tmp_prot);
       $protSelected = true;
 
     }
@@ -181,31 +216,48 @@ session_start();
       $stminus = $start-15;
       $stplus = $start +15;
 
-      $q1 .= " AND " . $start . " BETWEEN gene_1.Start AND gene_1.End";
-      $q2 .= " AND " . $start . " BETWEEN cov_comp.cov2Start AND cov_comp.cov2End";
-      $q3 .= " AND repeatcoord.coord BETWEEN '". $stminus  ."' AND '". $stplus  ."' "; 
-      $q4 .= " AND " . $start . " BETWEEN intragene.leftStart AND intragene.leftEnd OR " . $start . " BETWEEN intragene.rightStart AND intragene.rightEnd";
+      $q1 .= " AND ? BETWEEN gene_1.Start AND gene_1.End";
+      grParam($q1types, $q1params, 'n', $start);
+      $q2 .= " AND ? BETWEEN cov_comp.cov2Start AND cov_comp.cov2End";
+      grParam($q2types, $q2params, 'n', $start);
+      $q3 .= " AND repeatcoord.coord BETWEEN ? AND ? "; 
+      grParam($q3types, $q3params, 's', $stminus);
+      grParam($q3types, $q3params, 's', $stplus);
+      $q4 .= " AND ? BETWEEN intragene.leftStart AND intragene.leftEnd OR ? BETWEEN intragene.rightStart AND intragene.rightEnd";
+      grParam($q4types, $q4params, 'n', $start);
+      grParam($q4types, $q4params, 'n', $start);
 
     }
 
     if($start != "" and $end != "") {
-      $q1 .= " AND (gene_1.Start BETWEEN '" . $start . "' AND '" . $end . "' OR gene_1.End BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN gene_1.Start AND gene_1.End) OR ('" . $end . "' BETWEEN gene_1.Start AND gene_1.End)) ";    
-      $q2 .= " AND (cov_comp.cov2Start BETWEEN '" . $start . "' AND '" . $end . "' OR cov_comp.cov2End BETWEEN '" . $start . "' AND '" . $end . "') ";
-      $q3 .= " AND repeatcoord.coord BETWEEN '". $start  ."' AND '". $end  ."' ";
+      $q1 .= " AND (gene_1.Start BETWEEN ? AND ? OR gene_1.End BETWEEN ? AND ? OR (? BETWEEN gene_1.Start AND gene_1.End) OR (? BETWEEN gene_1.Start AND gene_1.End)) ";    
+      foreach (array($start, $end, $start, $end, $start, $end) as $v) { grParam($q1types, $q1params, 's', $v); }
+      $q2 .= " AND (cov_comp.cov2Start BETWEEN ? AND ? OR cov_comp.cov2End BETWEEN ? AND ?) ";
+      foreach (array($start, $end, $start, $end) as $v) { grParam($q2types, $q2params, 's', $v); }
+      $q3 .= " AND repeatcoord.coord BETWEEN ? AND ? ";
+      grParam($q3types, $q3params, 's', $start);
+      grParam($q3types, $q3params, 's', $end);
       // if ((intval($end) - intval($start))<100){
       //   $runRepeat = true;
       // }
 
-      $q4 .=  " AND (intragene.leftStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.leftEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.leftStart AND intragene.leftEnd) OR ('" . $end . "' BETWEEN intragene.leftStart AND intragene.leftEnd)) OR  (intragene.rightStart BETWEEN '" . $start . "' AND '" . $end . "' OR intragene.rightEnd BETWEEN '" . $start . "' AND '" . $end . "' OR ('" . $start . "' BETWEEN intragene.rightStart AND intragene.rightEnd) OR ('" . $end . "' BETWEEN intragene.rightStart AND intragene.rightEnd))";  
+      $q4 .=  " AND (intragene.leftStart BETWEEN ? AND ? OR intragene.leftEnd BETWEEN ? AND ? OR (? BETWEEN intragene.leftStart AND intragene.leftEnd) OR (? BETWEEN intragene.leftStart AND intragene.leftEnd)) OR  (intragene.rightStart BETWEEN ? AND ? OR intragene.rightEnd BETWEEN ? AND ? OR (? BETWEEN intragene.rightStart AND intragene.rightEnd) OR (? BETWEEN intragene.rightStart AND intragene.rightEnd))";  
+      foreach (array($start, $end, $start, $end, $start, $end, $start, $end, $start, $end, $start, $end) as $v) { grParam($q4types, $q4params, 's', $v); }
     }
 
     if($start == "" and $end != "") {
       $edminus = $end-15;
       $edplus = $end +15;
-      $q1 .= " AND " . $end . " BETWEEN gene_1.Start AND gene_1.End";
-      $q2 .= " AND " . $end . " BETWEEN cov_comp.cov2Start AND cov_comp.cov2End"; 
-      $q3 .= " AND repeatcoord.coord BETWEEN '". $edminus  ."' AND '". $edplus  ."' "; 
-      $q4 .= " AND " . $end . " BETWEEN intragene.leftStart AND intragene.leftEnd OR " . $end . " BETWEEN intragene.rightStart AND intragene.rightEnd";
+      $q1 .= " AND ? BETWEEN gene_1.Start AND gene_1.End";
+      grParam($q1types, $q1params, 'n', $end);
+      $q2 .= " AND ? BETWEEN cov_comp.cov2Start AND cov_comp.cov2End"; 
+      grParam($q2types, $q2params, 'n', $end);
+      $q3 .= " AND repeatcoord.coord BETWEEN ? AND ? "; 
+      grParam($q3types, $q3params, 's', $edminus);
+      grParam($q3types, $q3params, 's', $edplus);
+      $q4 .= " AND ? BETWEEN intragene.leftStart AND intragene.leftEnd OR ? BETWEEN intragene.rightStart AND intragene.rightEnd";
+      grParam($q4types, $q4params, 'n', $end);
+      grParam($q4types, $q4params, 'n', $end);
 
     }
 
@@ -222,7 +274,7 @@ session_start();
 
     #Gets Genes
     $sql = "SELECT Gene, Protein, Accession, Start, End, `Function`, matchedcols FROM gene_1 WHERE 1=1 $q1 ORDER BY gene_1.Start = 0, gene_1.Start, gene_1.Protein";
-    $result = $con->query($sql);
+    $result = grQuery($con, $sql, $q1types, $q1params);
     if (!$result) {
       echo 'query error first: ' . htmlspecialchars($con->error, ENT_QUOTES, 'UTF-8');
       exit();
@@ -232,7 +284,7 @@ session_start();
 
     #Gets Domains
     $sqldom = "SELECT gene, feature, domainNameCov2, cov2Start, cov2End, cov2AAStartEnd FROM cov_comp WHERE 1=1 $q2 ORDER BY cov_comp.cov2Start + 0";
-    $resultDom = $con->query($sqldom);
+    $resultDom = grQuery($con, $sqldom, $q2types, $q2params);
     if (!$resultDom) {
       echo $sqldom;
       exit();
@@ -475,7 +527,7 @@ session_start();
                 // $q3 .= " AND repeatcoord.coord BETWEEN '".  $protst  ."' AND '".  $proted ."'";
                 if ($q3) {
                   $sqlRepeat = "SELECT sequence,coord FROM repeatcoord WHERE 1=1 $q3 ORDER BY repeatcoord.coord + 0";
-                  $resultRepeat  = $con->query($sqlRepeat);
+                  $resultRepeat  = grQuery($con, $sqlRepeat, $q3types, $q3params);
                   if (!$resultRepeat) {
                     echo $sqlRepeat;
                     exit();
@@ -560,7 +612,7 @@ session_start();
                 <?php
                                     
                     $sqlIntraGene = "SELECT leftStart, rightStart, leftEnd, rightEnd, readSupport FROM intragene WHERE 1=1 $q4 ORDER BY intragene.leftStart + 0";
-                    $resultIntragene = $con->query($sqlIntraGene);
+                    $resultIntragene = grQuery($con, $sqlIntraGene, $q4types, $q4params);
                     if (!$resultIntragene) {
                       echo $sqlIntraGene;
                       exit();
