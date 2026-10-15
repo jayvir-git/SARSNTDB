@@ -1082,7 +1082,13 @@
           try { localStorage.clear(); } catch (eStorage) {}
           var region = document.getElementById("Region").value;
           if (region === "All") {
-            alert("Please select a region.");
+            // Jim 2026-10-15: Region "All" searches the whole genome, like coordinates 1-29903.
+            activeSearchMode = "region";
+            activeMinPercent = document.getElementById("MinPercentRegion").value;
+            applyRegionCoordinates("All");
+            document.getElementById("emptyText").style.display = "none";
+            document.getElementById("mutationsData").style.display = "block";
+            getData("1", "29903", "All", activeMinPercent);
             return;
           }
 
@@ -1291,14 +1297,9 @@
           if (activeSearchMode === "region") {
             var region = document.getElementById("Region").value;
             if (region === "All") {
-              activeSearchMode = "coordinates";
-              activeMinPercent = document.getElementById("MinPercentCoord").value;
-              getData(
-                document.getElementById("Start").value,
-                document.getElementById("End").value,
-                "All",
-                activeMinPercent
-              );
+              activeMinPercent = document.getElementById("MinPercentRegion").value;
+              applyRegionCoordinates("All");
+              getData("1", "29903", "All", activeMinPercent);
               return;
             }
             activeMinPercent = document.getElementById("MinPercentRegion").value;
