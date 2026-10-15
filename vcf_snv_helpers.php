@@ -649,25 +649,36 @@ if (!function_exists('vcf_snv_frequency_rows')) {
             return [];
         }
         $gid = $group['id'];
-        $sql = 'SELECT g.Protein, c.coordinate, g.Start, g.End, COUNT(*) AS frequency
-                  FROM vcf_snv_call c'
-            . vcf_snv_eligible_sql_join($con, $group)
-            . ' LEFT OUTER JOIN gene_1 g ON c.coordinate BETWEEN g.Start AND g.End
-                 WHERE c.group_id = ? AND c.allele_frequency >= ?';
+        $region = trim((string) $region);
         $types = 'id';
         $params = [$gid, $minAf];
-        $region = trim((string) $region);
         if ($region !== '' && strcasecmp($region, 'All') !== 0) {
-            $sql .= ' AND g.Protein = ?';
+            $sql = 'SELECT g.Protein, c.coordinate, g.Start, g.End, COUNT(*) AS frequency
+                      FROM vcf_snv_call c'
+                . vcf_snv_eligible_sql_join($con, $group)
+                . ' LEFT OUTER JOIN gene_1 g ON c.coordinate BETWEEN g.Start AND g.End
+                     WHERE c.group_id = ? AND c.allele_frequency >= ? AND g.Protein = ?
+                     GROUP BY g.Protein, g.Start, g.End, c.coordinate';
             $types .= 's';
             $params[] = $region;
         } else {
+            // Whole genome or coordinates: count calls per coordinate first, then
+            // attach gene_1 (as in vcf_snv_detail_pack); joining gene_1 to every
+            // call took twice as long. Same rows: each call meets each matching
+            // gene once. CAST keeps frequency an integer, as COUNT(*) returned.
+            // A region keeps the query above, which is faster for one gene.
             $coord = vcf_snv_coord_clause($start, $end, 'c');
-            $sql .= $coord[0];
             $types .= $coord[2];
             $params = array_merge($params, $coord[1]);
+            $sql = 'SELECT g.Protein, x.coordinate, g.Start, g.End, CAST(SUM(x.n) AS SIGNED) AS frequency
+                      FROM (SELECT c.coordinate, COUNT(*) AS n
+                              FROM vcf_snv_call c'
+                . vcf_snv_eligible_sql_join($con, $group)
+                . '          WHERE c.group_id = ? AND c.allele_frequency >= ?' . $coord[0] . '
+                             GROUP BY c.coordinate) x
+                      LEFT OUTER JOIN gene_1 g ON x.coordinate BETWEEN g.Start AND g.End
+                     GROUP BY g.Protein, g.Start, g.End, x.coordinate';
         }
-        $sql .= ' GROUP BY g.Protein, g.Start, g.End, c.coordinate';
 
         $stmt = $con->prepare($sql);
         if (!$stmt) {
