@@ -47,6 +47,8 @@ MERGE_GROUPS = {
     "S_Afr-PRJNA636748": (
         "S_Afr-PRJNA636748",
         "S_Afr-PRJNA636748-1023-1024-bwa-pad",
+        # 15 Oct: third South Africa batch (groups sheet row 6, column K).
+        "S_Afr-PRJNA636748-02-10_2024-bwa-pad",
     ),
     "India-6000": (
         "India-6000-bwa-pad",

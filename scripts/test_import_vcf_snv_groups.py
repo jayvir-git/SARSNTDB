@@ -56,6 +56,8 @@ def test_nj_merge_and_labels():
     assert group_code_from_stem("LA-PRJNA815364-bwa-pad") == "LA-PRJNA815364"
     assert group_code_from_stem("S_Afr-PRJNA636748") == "S_Afr-PRJNA636748"
     assert group_code_from_stem("S_Afr-PRJNA636748-1023-1024-bwa-pad") == "S_Afr-PRJNA636748"
+    assert group_code_from_stem("S_Afr-PRJNA636748-02-10_2024-bwa-pad") == "S_Afr-PRJNA636748"
+    assert MERGE_GROUPS["S_Afr-PRJNA636748"][-1] == "S_Afr-PRJNA636748-02-10_2024-bwa-pad"
     assert group_code_from_stem("Port-bwa-pad-0-8") == "Port-PRJEB47340"
     assert group_code_from_stem("Port_8-10-bwa-pad") == "Port-PRJEB47340"
     assert group_code_from_stem("Port_11-12-bwa-pad") == "Port-PRJEB47340"
@@ -117,9 +119,9 @@ def test_keep_first_duplicate(tmp_path: Path):
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr(inner, first if i == 0 else second)
     stats = import_groups(tmp_path, only_group="S_Afr-PRJNA636748", apply=False)
-    assert stats["S_Afr-PRJNA636748"]["duplicate_samples"] == 1
+    assert stats["S_Afr-PRJNA636748"]["duplicate_samples"] == len(stems) - 1
     assert stats["S_Afr-PRJNA636748"]["samples"] == 1
-    assert stats["S_Afr-PRJNA636748"]["zips"] == 2
+    assert stats["S_Afr-PRJNA636748"]["zips"] == len(stems)
 
 
 def test_list_file(tmp_path: Path):
