@@ -28,42 +28,88 @@ error_reporting(E_ALL);
 
     $q1 = $q2 = $q3 = $q4 = "";
     $selection = '';
+    // URL values are bound as parameters, never pasted into the SQL (Q-27).
+    // $q1 and $q4 have matching $qNtypes/$qNparams; values that were unquoted
+    // in the SQL stay numeric ('d'), quoted ones stay strings ('s').
+    $q1types = $q4types = "";
+    $q1params = $q4params = array();
+
+    // Adds one parameter: 's' keeps the old quoted-string comparison,
+    // 'n' keeps the old unquoted numeric one.
+    function msParam(&$types, &$params, $kind, $value) {
+      if ($kind === 'n' && is_numeric($value)) {
+        $types .= 'd';
+        $params[] = (float) $value;
+      } else {
+        $types .= 's';
+        $params[] = (string) $value;
+      }
+    }
+
+    // Runs $sql with its bound parameters; returns the result or false, like query().
+    function msQuery($con, $sql, $types, $params) {
+      if ($types === "") {
+        return $con->query($sql);
+      }
+      $stmt = $con->prepare($sql);
+      if (!$stmt) {
+        return false;
+      }
+      $stmt->bind_param($types, ...$params);
+      if (!$stmt->execute()) {
+        return false;
+      }
+      return $stmt->get_result();
+    }
     
 
     if($referenceBase != ""){
-      $q1 .= " AND m.reference = '" . $referenceBase . "'";
+      $q1 .= " AND m.reference = ?";
+      msParam($q1types, $q1params, 's', $referenceBase);
     }
 
     if($alternateBase != ""){
-      $q1 .= " AND m.alternate = '" . $alternateBase . "'";
+      $q1 .= " AND m.alternate = ?";
+      msParam($q1types, $q1params, 's', $alternateBase);
     }
 
     if($start != "" and $end == "") {
-      $q1 .= " AND m.coordinate >= " . $start;
-      $q4 .= " AND irs.coordinate >= " . $start;
+      $q1 .= " AND m.coordinate >= ?";
+      msParam($q1types, $q1params, 'n', $start);
+      $q4 .= " AND irs.coordinate >= ?";
+      msParam($q4types, $q4params, 'n', $start);
       $selection = 'coordinates';
     }
 
     if($start != "" and $end != "") {
-      $q1 .= " AND m.coordinate BETWEEN " . $start . " AND " . $end;
-      $q4 .= " AND irs.Coordinate BETWEEN " . $start . " AND " . $end;
+      $q1 .= " AND m.coordinate BETWEEN ? AND ?";
+      msParam($q1types, $q1params, 'n', $start);
+      msParam($q1types, $q1params, 'n', $end);
+      $q4 .= " AND irs.Coordinate BETWEEN ? AND ?";
+      msParam($q4types, $q4params, 'n', $start);
+      msParam($q4types, $q4params, 'n', $end);
       $selection = 'coordinates';
     }
     
     if($start == "" and $end != "") {
-      $q1 .= " AND m.coordinate <= " . $end;
-      $q4 .= " AND irs.Coordinate <= " . $end;
+      $q1 .= " AND m.coordinate <= ?";
+      msParam($q1types, $q1params, 'n', $end);
+      $q4 .= " AND irs.Coordinate <= ?";
+      msParam($q4types, $q4params, 'n', $end);
 
       $selection = 'coordinates';
     }
     if($region != "" and $selection == ""){
-      $q1 .= " AND g.Protein = '" . $region . "'";
+      $q1 .= " AND g.Protein = ?";
+      msParam($q1types, $q1params, 's', $region);
       $q3 .= "INNER JOIN gene_1 g ON m.coordinate BETWEEN g.Start AND g.End";
-      $q4 .= " AND g.Protein = '" . $region . "'";
+      $q4 .= " AND g.Protein = ?";
+      msParam($q4types, $q4params, 's', $region);
       $selection = 'region';
     }
     if($instrument != ""){
-      $q1 .= " AND m.instrument = '" . $instrument . "'";
+      $q1 .= " AND m.instrument = ?";
+      msParam($q1types, $q1params, 's', $instrument);
     }
     else {
       $q2 = " UNION
@@ -115,7 +161,10 @@ error_reporting(E_ALL);
               ) m2
             GROUP BY reference, instrument
             ORDER BY reference, instrument";
-    $result = $con->query($sql);
+    // $q1 appears twice when the ALL union ($q2) is included.
+    $sqlTypes = $q2 !== "" ? $q1types . $q1types : $q1types;
+    $sqlParams = $q2 !== "" ? array_merge($q1params, $q1params) : $q1params;
+    $result = msQuery($con, $sql, $sqlTypes, $sqlParams);
     // echo ($sql);
     if (!$result) {
       echo ($sql);
@@ -178,7 +227,7 @@ error_reporting(E_ALL);
     } elseif ($useVcfGroup) {
       $result2_rows = vcf_snv_frequency_rows($con, $vcfGroupCode, $vcfMinAf, $start, $end, $region);
     } else {
-    $result2 = $con->query($sql2);
+    $result2 = msQuery($con, $sql2, $q1types, $q1params);
     // echo ($sql2);
 
     if (!$result2) {
@@ -310,7 +359,7 @@ error_reporting(E_ALL);
               
     // //console.log($sql3) and irs.icshape_score is not null;
     // echo ($sql3);
-    $result3 = $con->query($sql3);
+    $result3 = msQuery($con, $sql3, $q4types, $q4params);
     if (!$result3) {
 
       echo ($sql3);
@@ -325,7 +374,7 @@ error_reporting(E_ALL);
 
     // //console.log($sql3) and irs.icshape_score is not null;
     // echo ($sql3);
-    $result3wt = $con->query($sql3wt);
+    $result3wt = msQuery($con, $sql3wt, $q4types, $q4params);
     if (!$result3wt) {
 
       echo ($sql3wt);
@@ -341,7 +390,7 @@ error_reporting(E_ALL);
               where 1=1 $q4 and irs.shapeval is not null";
 
 
-    $result3Delta = $con->query($sql3Delta);
+    $result3Delta = msQuery($con, $sql3Delta, $q4types, $q4params);
     if (!$result3Delta) {
 
       echo ($sql3Delta);
@@ -358,7 +407,7 @@ error_reporting(E_ALL);
 
     // //console.log($sql3) and irs.icshape_score is not null;
     // echo ($sql3GSE153984);
-    $result3GSE153984 = $con->query($sql3GSE153984);
+    $result3GSE153984 = msQuery($con, $sql3GSE153984, $q4types, $q4params);
     if (!$result3GSE153984) {
 
       echo ($sql3GSE153984);
