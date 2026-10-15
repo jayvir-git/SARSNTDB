@@ -44,24 +44,32 @@
 		$target_seq = $_GET['target_seq'];
 	}
 
-	$sql = "SELECT guide_binary, target_binary, target_seq, target_ref_id, target_ref_mapped_start, target_ref_mapped_end, target_transcript_id, target_gene_mapped_region, gene_name, transcript_biotype, read_count, free_energy FROM clash_chimeras LEFT JOIN transcripts ON clash_chimeras.target_transcript_id = transcripts.transcript_id WHERE guide_seq = '" . $guide_seq . "' AND target_seq = '" . $target_seq . "'";
+	// URL values are bound as parameters, never pasted into the SQL (Q-27).
+	function hybridQuery($con, $sql, $params) {
+		$stmt = $con->prepare($sql);
+		$stmt->bind_param(str_repeat('s', count($params)), ...$params);
+		$stmt->execute();
+		return $stmt->get_result();
+	}
+
+	$sql = "SELECT guide_binary, target_binary, target_seq, target_ref_id, target_ref_mapped_start, target_ref_mapped_end, target_transcript_id, target_gene_mapped_region, gene_name, transcript_biotype, read_count, free_energy FROM clash_chimeras LEFT JOIN transcripts ON clash_chimeras.target_transcript_id = transcripts.transcript_id WHERE guide_seq = ? AND target_seq = ?";
 	//echo $sql."<br / >";
-	$result = $con->query($sql);
+	$result = hybridQuery($con, $sql, array($guide_seq, $target_seq));
 	if($result->num_rows == 0){
 		echo "<h2>No results found.</h2>";
         exit();
 	}
 	
-	$sql_guide = "SELECT DISTINCT alternative_id, guide_id, guide_ref_id_format, guide_ref_mapped_region, guide_ref_mapped_start_s1, guide_ref_mapped_end_s1 FROM trf WHERE guide_seq = '" . $guide_seq . "'";
+	$sql_guide = "SELECT DISTINCT alternative_id, guide_id, guide_ref_id_format, guide_ref_mapped_region, guide_ref_mapped_start_s1, guide_ref_mapped_end_s1 FROM trf WHERE guide_seq = ?";
     //echo $sql_guide."<br / >";
     
-    $sql_motif = "SELECT motif_start, motif_end, motif_bits FROM trf_motif WHERE guide_seq = '" . $guide_seq . "'";
+    $sql_motif = "SELECT motif_start, motif_end, motif_bits FROM trf_motif WHERE guide_seq = ?";
     //echo $sql_motif."<br / >";
 	
-	$sql_par_mut = "SELECT mut_pos_s1, rpm FROM trf_ip_mut_rpm WHERE guide_seq = '" . $guide_seq . "' ORDER BY rpm DESC";
+	$sql_par_mut = "SELECT mut_pos_s1, rpm FROM trf_ip_mut_rpm WHERE guide_seq = ? ORDER BY rpm DESC";
     //echo $sql_par_mut."<br / >";
 	
-	$result_motif = $con->query($sql_motif);
+	$result_motif = hybridQuery($con, $sql_motif, array($guide_seq));
     if($result_motif->num_rows > 0){
 		$row_motif = $result_motif->fetch_assoc();
 		$motif_bits = $row_motif['motif_bits'];
@@ -76,7 +84,7 @@
 	}
     
     $parclip_format = array();
-    $result_par_mut = $con->query($sql_par_mut);
+    $result_par_mut = hybridQuery($con, $sql_par_mut, array($guide_seq));
     if($result_par_mut->num_rows > 0){
 		while ($row_par_mut = $result_par_mut->fetch_assoc()) {
 			$mut_pos_s1 = $row_par_mut['mut_pos_s1'];
@@ -85,7 +93,7 @@
 		}
 	}
 
-	$result_guide = $con->query($sql_guide);    
+	$result_guide = hybridQuery($con, $sql_guide, array($guide_seq));    
     if ($result_guide->num_rows == 0) {
         echo "<h2>No tRFs found.</h2>";
         exit();

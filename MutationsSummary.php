@@ -559,12 +559,12 @@ error_reporting(E_ALL);
           $colorPoint = "red";
         }
 
-        if (round($row[$shapeScoreKey],3) == 0){
+        if (round($row[$shapeScoreKey] ?? 0,3) == 0){
           $row[$shapeScoreKey]= 'NaN';
           array_push($B, array("label" => "$shapeScoreLabel", "y" => 'NaN', "color" => "black")); 
        
         }else{
-          array_push($B, array("label" => "$shapeScoreLabel", "y" => round($row[$shapeScoreKey], 3), "color" => "$colorPoint")); 
+          array_push($B, array("label" => "$shapeScoreLabel", "y" => round($row[$shapeScoreKey] ?? 0, 3), "color" => "$colorPoint")); 
        
         }
 
@@ -576,12 +576,12 @@ error_reporting(E_ALL);
             $colorPoint = "red";
           }
   
-          if (round($rowWT[$shapeScoreKey],3) == 0){
+          if (round($rowWT[$shapeScoreKey] ?? 0,3) == 0){
             $rowWT[$shapeScoreKey]= 'NaN';
             array_push($BWT, array("label" => "$shapeScoreLabel", "y" => 'NaN', "color" => "black")); 
          
           }else{
-            array_push($BWT, array("label" => "$shapeScoreLabel", "y" => round($rowWT[$shapeScoreKey], 3), "color" => "$colorPoint")); 
+            array_push($BWT, array("label" => "$shapeScoreLabel", "y" => round($rowWT[$shapeScoreKey] ?? 0, 3), "color" => "$colorPoint")); 
          
           }
         }
@@ -593,12 +593,12 @@ error_reporting(E_ALL);
             $colorPoint = "red";
           }
   
-          if (round($rowDELTA[$shapeScoreKey],3) == 0){
+          if (round($rowDELTA[$shapeScoreKey] ?? 0,3) == 0){
             $rowDELTA[$shapeScoreKey]= 'NaN';
             array_push($BDELTA, array("label" => "$shapeScoreLabel", "y" => 'NaN', "color" => "black")); 
          
           }else{
-            array_push($BDELTA, array("label" => "$shapeScoreLabel", "y" => round($rowDELTA[$shapeScoreKey], 3), "color" => "$colorPoint")); 
+            array_push($BDELTA, array("label" => "$shapeScoreLabel", "y" => round($rowDELTA[$shapeScoreKey] ?? 0, 3), "color" => "$colorPoint")); 
          
           }
         }
@@ -610,17 +610,17 @@ error_reporting(E_ALL);
             $colorPoint = "red";
           }
   
-          if (round($rowGSE153984[$shapeScoreKey],3) == 0){
+          if (round($rowGSE153984[$shapeScoreKey] ?? 0,3) == 0){
             $rowGSE153984[$shapeScoreKey]= 'NaN';
             array_push($BGSE153984, array("label" => "$shapeScoreLabel", "y" => 'NaN', "color" => "black")); 
          
           }else{
-            array_push($BGSE153984, array("label" => "$shapeScoreLabel", "y" => round($rowGSE153984[$shapeScoreKey], 3), "color" => "$colorPoint")); 
+            array_push($BGSE153984, array("label" => "$shapeScoreLabel", "y" => round($rowGSE153984[$shapeScoreKey] ?? 0, 3), "color" => "$colorPoint")); 
          
           }
         }
 
-        // array_push($B, array("label" => "$shapeScoreLabel", "y" => round($row[$shapeScoreKey], 3), "color" => "$colorPoint")); 
+        // array_push($B, array("label" => "$shapeScoreLabel", "y" => round($row[$shapeScoreKey] ?? 0, 3), "color" => "$colorPoint")); 
        
         $lowerBound = $upperBound + 1;
         
