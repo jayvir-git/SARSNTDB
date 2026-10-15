@@ -1064,7 +1064,8 @@
         }
 
         function submitCoordinateSearch() {
-          localStorage.clear();
+          // Some browsers block site storage; clear() then throws and Submit would do nothing.
+          try { localStorage.clear(); } catch (eStorage) {}
           document.getElementById("Region").value = "All";
           activeSearchMode = "coordinates";
           activeMinPercent = document.getElementById("MinPercentCoord").value;
@@ -1078,7 +1079,7 @@
         }
 
         function submitRegionSearch() {
-          localStorage.clear();
+          try { localStorage.clear(); } catch (eStorage) {}
           var region = document.getElementById("Region").value;
           if (region === "All") {
             alert("Please select a region.");
