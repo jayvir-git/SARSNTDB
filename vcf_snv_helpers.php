@@ -490,33 +490,35 @@ if (!function_exists('vcf_snv_detail_pack')) {
         $gid = $group['id'];
         $region = trim((string) $region);
         $useRegion = $region !== '' && strcasecmp($region, 'All') !== 0;
-        $eligJoin = vcf_snv_eligible_sql_join($con, $group);
-        $join = $useRegion
-            ? $eligJoin . ' INNER JOIN gene_1 g ON c.coordinate BETWEEN g.Start AND g.End'
-            : $eligJoin . ' LEFT JOIN gene_1 g ON c.coordinate BETWEEN g.Start AND g.End';
-        $sql = 'SELECT c.reference, c.alternate, c.coordinate, g.protein, g.domain,
-                       COUNT(*) AS no_of_samples,
-                       g.protSeq, g.RNA_sequence, g.Start
-                  FROM vcf_snv_call c'
-            . $join
+        // Count calls per SNV first, then attach gene_1. Grouping by the gene's
+        // RNA_sequence and protSeq per call spilled a large temporary table to disk
+        // (Detail took 30-150 s). Counts are the same: each call meets a gene once.
+        $inner = 'SELECT c.reference, c.alternate, c.coordinate, COUNT(*) AS no_of_samples
+                    FROM vcf_snv_call c'
+            . vcf_snv_eligible_sql_join($con, $group)
             . ' WHERE c.group_id = ? AND c.allele_frequency >= ?';
         $types = 'id';
         $params = [$gid, $minAf];
-
-        if ($useRegion) {
-            $sql .= ' AND g.Protein = ?';
-            $types .= 's';
-            $params[] = $region;
-        } else {
+        if (!$useRegion) {
             $coord = vcf_snv_coord_clause($start, $end, 'c');
-            $sql .= $coord[0];
+            $inner .= $coord[0];
             $types .= $coord[2];
             $params = array_merge($params, $coord[1]);
         }
+        $inner .= ' GROUP BY c.reference, c.alternate, c.coordinate';
 
-        $sql .= ' GROUP BY c.reference, c.alternate, c.coordinate, g.protein, g.domain,
-                         g.protSeq, g.RNA_sequence, g.Start
-                  ORDER BY c.coordinate';
+        $sql = 'SELECT x.reference, x.alternate, x.coordinate, g.protein, g.domain,
+                       x.no_of_samples,
+                       g.protSeq, g.RNA_sequence, g.Start
+                  FROM (' . $inner . ') x'
+            . ($useRegion ? ' INNER' : ' LEFT')
+            . ' JOIN gene_1 g ON x.coordinate BETWEEN g.Start AND g.End';
+        if ($useRegion) {
+            $sql .= ' WHERE g.Protein = ?';
+            $types .= 's';
+            $params[] = $region;
+        }
+        $sql .= ' ORDER BY x.coordinate';
 
         $stmt = $con->prepare($sql);
         if (!$stmt) {
