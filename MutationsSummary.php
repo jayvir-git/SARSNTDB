@@ -61,6 +61,52 @@ error_reporting(E_ALL);
       }
       return $stmt->get_result();
     }
+
+    // Shape averages per chart range (shapeval, WTSHAPE, DELTA, GSE153984), in the
+    // same row shape as the four per-column queries: one row keyed "(lo - hi)", null
+    // for a range with no values. Returns null (callers fall back to those queries)
+    // when the ranges overlap or anything fails.
+    function msShapeRows($con, $ranges, $q4, $types, $params) {
+      $when = array();
+      $prevHi = null;
+      foreach ($ranges as $i => $range) {
+        if ($range[0] > $range[1]) {
+          continue;
+        }
+        if ($prevHi !== null && $range[0] <= $prevHi) {
+          return null;
+        }
+        $prevHi = $range[1];
+        $when[] = "WHEN coordinate BETWEEN " . intval($range[0]) . " AND " . intval($range[1]) . " THEN " . intval($i);
+      }
+      if (!$when) {
+        return null;
+      }
+      $sql = "SELECT CASE " . implode(' ', $when) . " END AS bucket,
+                     avg(shapeval) AS s, avg(WTSHAPE) AS w, avg(DELTA) AS d, avg(GSE153984) AS g
+                FROM shapedata irs
+               inner join gene_1 g on irs.Coordinate between g.Start and g.End
+               where 1=1 $q4 and irs.shapeval is not null
+               GROUP BY bucket ORDER BY NULL";
+      $result = msQuery($con, $sql, $types, $params);
+      if (!$result) {
+        return null;
+      }
+      $byBucket = array();
+      while ($row = $result->fetch_assoc()) {
+        if ($row['bucket'] !== null) {
+          $byBucket[intval($row['bucket'])] = $row;
+        }
+      }
+      $out = array(array(), array(), array(), array());
+      foreach ($ranges as $i => $range) {
+        $key = "(" . $range[0] . " - " . $range[1] . ")";
+        foreach (array('s', 'w', 'd', 'g') as $j => $col) {
+          $out[$j][$key] = isset($byBucket[$i]) ? $byBucket[$i][$col] : null;
+        }
+      }
+      return array(array($out[0]), array($out[1]), array($out[2]), array($out[3]));
+    }
     
 
     if($referenceBase != ""){
@@ -319,8 +365,10 @@ error_reporting(E_ALL);
     // echo $lowerBound;
     // echo $upperBound;
     // echo $gap;
-    for($k = $lowerBound; $k <= $xAxisGraphEnd; ) {     
-      
+    $shapeRanges = array();
+    for($k = $lowerBound; $k <= $xAxisGraphEnd; ) {
+      $shapeRanges[] = array($lowerBound, $upperBound);
+
       $pq .= "avg (case when coordinate BETWEEN $lowerBound and $upperBound
                  then shapeval end) '($lowerBound - $upperBound)' ";
 
@@ -353,6 +401,12 @@ error_reporting(E_ALL);
 
     //$pq = substr($pq, 0, -1);
 
+    // One grouped pass gives the same four averages as the four queries below,
+    // which each evaluated ~300 CASE columns per row (about 5 s for the whole genome).
+    $shapeRows = msShapeRows($con, $shapeRanges, $q4, $q4types, $q4params);
+    if ($shapeRows !== null) {
+      list($result3_rows, $result3wt_rows, $result3DELTA_rows, $result3GSE153984_rows) = $shapeRows;
+    } else {
     $sql3 = "SELECT $pq FROM shapedata irs 
                 inner join gene_1 g on irs.Coordinate between g.Start and g.End
               where 1=1 $q4 and irs.shapeval is not null";
@@ -415,6 +469,7 @@ error_reporting(E_ALL);
       exit();
     }
     $result3GSE153984_rows = $result3GSE153984->fetch_all(MYSQLI_ASSOC);
+    }
 
 
 
