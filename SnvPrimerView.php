@@ -15,7 +15,10 @@ if (isset($_GET['coord']) && is_numeric($_GET['coord'])) {
 $refBase = isset($_GET['ref']) ? trim((string) $_GET['ref']) : '';
 $altBase = isset($_GET['alt']) ? trim((string) $_GET['alt']) : '';
 $protein = isset($_GET['protein']) ? trim((string) $_GET['protein']) : '';
-$variantKind = (isset($_GET['kind']) && $_GET['kind'] === 'indel') ? 'indel' : 'snv';
+$variantKind = (isset($_GET['kind']) && in_array($_GET['kind'], ['indel', 'repeat'], true)) ? (string) $_GET['kind'] : 'snv';
+// Repeats search links here with kind=repeat (Jim, Zoom 2026-10-19, D-76).
+$repeatSeq = isset($_GET['repeat']) ? strtoupper(preg_replace('/[^ACGTUacgtu]/', '', (string) $_GET['repeat'])) : '';
+$kindWord = $variantKind === 'indel' ? 'indel' : ($variantKind === 'repeat' ? 'repeat' : 'SNV');
 $showNearbySnvs = !(isset($_GET['nearby']) && (string) $_GET['nearby'] === '0');
 $selectedPrimerId = '';
 if (isset($_GET['primer']) && ctype_digit((string) $_GET['primer'])) {
@@ -46,7 +49,9 @@ if ($coord < 1 || $coord > 29903) {
     $overlayGroupRow = vcf_snv_group_row($con, $overlayGroup);
     $overlayGroupLabel = $overlayGroupRow !== null ? (string) $overlayGroupRow['label'] : '';
     $pangoOverlay = pango_overlay_markers($con);
-    if ($variantKind === 'indel') {
+    if ($variantKind === 'repeat') {
+        // No Pango lookup for a repeat position.
+    } elseif ($variantKind === 'indel') {
         if ($refBase !== '' && $altBase !== '') {
             $pangoLineages = pango_indel_lineages_for($con, $coord, $refBase, $altBase);
         } else {
@@ -84,6 +89,9 @@ $snvLabel = ($variantKind === 'indel' && $refBase !== '' && $altBase !== '')
     : (($refBase !== '' && $altBase !== '')
         ? snv_pango_format_label($coord, $refBase, $altBase)
         : (($variantKind === 'indel' ? 'Indel ' : 'SNV ') . $coord));
+if ($variantKind === 'repeat') {
+    $snvLabel = 'Repeat ' . ($repeatSeq !== '' ? $repeatSeq . ' ' : '') . 'at ' . $coord;
+}
 $titleBits = [$snvLabel];
 if ($variantKind === 'indel' && strpos($snvLabel, 'REF=') === false) {
     array_unshift($titleBits, 'Indel');
@@ -126,7 +134,7 @@ foreach ($snvPrimers as $primer) {
     <div class="panel-body">
         <p style="font-size:13px; max-width:900px;">
             Primers whose start or end is within <strong>&plusmn;<?php echo (int) $primerWindow; ?> nt</strong>
-            of this <?php echo $variantKind === 'indel' ? 'indel' : 'SNV'; ?>
+            of this <?php echo $kindWord; ?>
             (same window idea as junction primer arrows).
             Pale dotted lines are other SNVs in <strong><?php echo htmlspecialchars($overlayGroupLabel !== '' ? $overlayGroupLabel : $overlayGroup, ENT_QUOTES, 'UTF-8'); ?></strong>
             (≥1% of analyzed samples, AF ≥ <?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>); change the group below.
@@ -185,8 +193,11 @@ foreach ($snvPrimers as $primer) {
             <?php if ($protein !== '') : ?>
                 <input type="hidden" name="protein" value="<?php echo htmlspecialchars($protein, ENT_QUOTES, 'UTF-8'); ?>" />
             <?php endif; ?>
-            <?php if ($variantKind === 'indel') : ?>
-                <input type="hidden" name="kind" value="indel" />
+            <?php if ($variantKind !== 'snv') : ?>
+                <input type="hidden" name="kind" value="<?php echo htmlspecialchars($variantKind, ENT_QUOTES, 'UTF-8'); ?>" />
+            <?php endif; ?>
+            <?php if ($repeatSeq !== '') : ?>
+                <input type="hidden" name="repeat" value="<?php echo htmlspecialchars($repeatSeq, ENT_QUOTES, 'UTF-8'); ?>" />
             <?php endif; ?>
             <?php if ($selectedPrimerId !== '') : ?>
                 <input type="hidden" name="primer" id="tsgPrimerHidden" value="<?php echo htmlspecialchars($selectedPrimerId, ENT_QUOTES, 'UTF-8'); ?>" />
@@ -258,7 +269,7 @@ window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261019-nearby"></script>
+<script src="JS/twoSegmentViz.js?v=20261019-repeat"></script>
 <script>
 (function () {
     var sel = document.getElementById('tsgPrimerSelect');

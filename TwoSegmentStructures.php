@@ -259,7 +259,7 @@ window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261019-nearby"></script>
+<script src="JS/twoSegmentViz.js?v=20261019-repeat"></script>
 <script>
 (function ($) {
     $(function () {
