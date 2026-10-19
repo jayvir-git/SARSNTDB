@@ -275,9 +275,14 @@
       tdsuperhead.classList.add("comp-table-row-td");
       td.appendChild(document.createTextNode("Start Coordinates"));
       tdsuperhead.appendChild(document.createTextNode("Location"));
+      // Primers within 800 nt of each hit (Jim, Zoom 2026-10-19, D-76).
+      var tdprimerhead = document.createElement('td');
+      tdprimerhead.classList.add("comp-table-row-td");
+      tdprimerhead.appendChild(document.createTextNode("Primers"));
       
       tr.appendChild(td);
       tr.appendChild(tdsuperhead);
+      tr.appendChild(tdprimerhead);
       theTable.appendChild(tr);
 
       for (var i = 0, tr, td; i < arrayLength; i++) {
@@ -314,8 +319,19 @@
         tdsuper.appendChild(linkEle);
         
         
+        var tdprimer = document.createElement('td');
+        tdprimer.classList.add("comp-table-row-td");
+        if (!isNaN(parseInt(zippedArray[i][0], 10))) {
+          var primerLink = document.createElement('a');
+          primerLink.href = "./SnvPrimerView.php?coord=" + parseInt(zippedArray[i][0], 10) + "&kind=repeat&repeat=" + encodeURIComponent(repeat);
+          primerLink.target = "_blank";
+          primerLink.appendChild(document.createTextNode("±800 nt"));
+          tdprimer.appendChild(primerLink);
+        }
+
         tr.appendChild(td);
         tr.appendChild(tdsuper);
+        tr.appendChild(tdprimer);
         theTable.appendChild(tr);
 
       }

@@ -110,7 +110,7 @@ if (!function_exists('tsg_rows_matching_repeat')) {
         if (strlen($userRepeat) < 4) {
             return [];
         }
-        $lu = strtolower($userRepeat);
+        $lu = str_replace('u', 't', strtolower($userRepeat)); // Compare as DNA: stored repeats may use U (D-60).
         $out = [];
         $seen = [];
         $sql = 'SELECT id, name, junction_kind, repeat_seq, notes FROM two_segment_structure
@@ -131,7 +131,7 @@ if (!function_exists('tsg_rows_matching_repeat')) {
             if (tsg_is_illustrative_junction($row)) {
                 continue;
             }
-            $r = strtolower(trim((string) $row['repeat_seq']));
+            $r = str_replace('u', 't', strtolower(trim((string) $row['repeat_seq'])));
             if ($r === '') {
                 continue;
             }

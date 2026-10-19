@@ -666,7 +666,8 @@
     if (breakpointKind === 'left') {
       kindLabel = 'Left breakpoint';
     } else if (breakpointKind === 'snv') {
-      kindLabel = global.TSG_VARIANT_KIND === 'indel' ? 'Indel position' : 'SNV position';
+      kindLabel = global.TSG_VARIANT_KIND === 'indel' ? 'Indel position'
+        : (global.TSG_VARIANT_KIND === 'repeat' ? 'Repeat position' : 'SNV position');
     }
     title.innerHTML = '<strong>' + esc(kindLabel) +
       ': ' + esc(breakpoint) + '</strong> &nbsp;|&nbsp; window ' + esc(windowRange.start) +
@@ -859,7 +860,7 @@
     var header = document.createElement('h4');
     header.className = 'search-header';
     header.textContent = 'Primers near ' +
-      (global.TSG_VARIANT_KIND === 'indel' ? 'indel' : 'SNV') +
+      (global.TSG_VARIANT_KIND === 'indel' ? 'indel' : (global.TSG_VARIANT_KIND === 'repeat' ? 'repeat' : 'SNV')) +
       ' ' + coord + ' (\u00b1800 nt)';
     frag.appendChild(header);
     if (!selected.length) {
