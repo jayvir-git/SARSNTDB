@@ -56,6 +56,12 @@ session_start();
     if(isset($_GET['End'])){
         $end = $_GET['End'];
     }
+    // Sequences are DNA: U is read as T (Jim, 2026-10-19).
+    foreach (array('start', 'end') as $seqField) {
+        if (preg_match('/^[ACGTUacgtu]+$/', (string) $$seqField)) {
+            $$seqField = str_replace('U', 'T', strtoupper($$seqField));
+        }
+    }
     $runRepeat = false;
     $q1 = "";
     $q2 = "";

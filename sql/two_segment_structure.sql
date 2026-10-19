@@ -26,13 +26,13 @@ INSERT INTO `two_segment_structure`
 VALUES
   ('sgmRNA', 'CJ', 'sgmRNA — S (body start 21563)', 1, 70, 21563, 29903, 'acgaac', NULL,
    'Demo: leader ~1–70, body from S gene start per Gene_1 in repo.', 10),
-  ('sgmRNA', 'CJ', 'sgmRNA — ORF3a (body start 25393)', 1, 70, 25393, 29903, 'acgaacuu', NULL,
+  ('sgmRNA', 'CJ', 'sgmRNA — ORF3a (body start 25393)', 1, 70, 25393, 29903, 'acgaactt', NULL,
    'Demo: illustrative TRS/body layout; confirm with literature.', 20),
   ('sgmRNA', 'CJ', 'sgmRNA — E (body start 26245)', 1, 70, 26245, 29903, 'acgaac', NULL,
    'Demo: E gene body start per Gene_1.', 30),
-  ('sgmRNA', 'CJ', 'sgmRNA — M (body start 26523)', 1, 70, 26523, 29903, 'acgaacuaaa', NULL,
+  ('sgmRNA', 'CJ', 'sgmRNA — M (body start 26523)', 1, 70, 26523, 29903, 'acgaactaaa', NULL,
    'Demo: motif fragment from Gene_2 M junction text.', 40),
-  ('sgmRNA', 'CJ', 'sgmRNA — N (body start 28274)', 1, 70, 28274, 29903, 'acucaugcag', NULL,
+  ('sgmRNA', 'CJ', 'sgmRNA — N (body start 28274)', 1, 70, 28274, 29903, 'actcatgcag', NULL,
    'Demo: motif fragment from Gene_2 N junction text.', 50),
   ('sgmRNA', 'NJ', 'NJ demo (non-canonical; right flank near S TRS)', 1, 70, 21558, 21570, 'acgaac', NULL,
    'Demo NJ row: coord_right inside a narrow window around the S canonical junction for interval testing.', 15);

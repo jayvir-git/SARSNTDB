@@ -22,6 +22,8 @@ from import_vcf_snv_groups import mysql_run, parse_connection_php, sql_str
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_sample_meta.sql"
+# Re-applied after eligibility is rewritten (Jim, 2026-10-19).
+NO_NJ_READS_SQL = ROOT / "sql" / "vcf_snv_no_nj_reads.sql"
 PACKET = ROOT / "_incoming" / "jim-kelley" / "2026-09-17_snv-variant-primer-data" / "files"
 EXTRA_META_DIR = ROOT / "_incoming" / "jim-kelley" / "2026-09-23_nj-on-junction-page" / "files"
 META_ZIP = PACKET / "Variant_primer_data-20260917T202015Z-1-001.zip"
@@ -401,6 +403,7 @@ def apply_rows(cfg: dict, meta_sql: list[str], elig_sql: list[str], codes: list[
             + ";",
             cfg,
         )
+    mysql_run(NO_NJ_READS_SQL.read_text(encoding="utf-8"), cfg)
 
 
 def main() -> None:

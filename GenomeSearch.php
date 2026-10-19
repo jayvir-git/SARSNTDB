@@ -625,6 +625,12 @@
         var endEl = document.getElementById("End");
         if (!startEl || !endEl) { return; }
         var protein = proteinEl ? proteinEl.value : "";
+        // Sequences are DNA: U is read as T (Jim, 2026-10-19).
+        [startEl, endEl].forEach(function (el) {
+          if (/^[ACGTUacgtu]+$/.test(el.value.trim())) {
+            el.value = el.value.trim().toUpperCase().replace(/U/g, "T");
+          }
+        });
         var start = startEl.value;
         var end = endEl.value;
 
@@ -829,6 +835,9 @@
             <div class="col-md-2">
                 <label for="End">End</label>
                 <input id="End" type="text" class="form-control" id="End" value="<?php echo htmlspecialchars($endData); ?>"/>
+            </div>
+            <div class="col-md-2">
+                <small class="text-muted" style="display:block;margin-top:28px;">A coordinate, or a sequence using only A, T, G and C. A U is read as T.</small>
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-success" id="submit_btn" name="submit" onclick="getGenomeData(true)">Submit</button>
