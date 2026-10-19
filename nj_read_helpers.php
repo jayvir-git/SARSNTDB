@@ -913,9 +913,10 @@ if (!function_exists('nj_read_breakdown_raw')) {
 
 if (!function_exists('nj_read_early_counts')) {
     /**
-     * Early is a 2020–2021 list sample whose variant is "." or blank.
-     * A group with no list contributes nothing. "." off the list is ignored.
-     * Defined term (D-54): counting every "." sample was tried and reverted.
+     * Early is an analyzed sample (on the group sample list, has a VCF, QC PASS) that is on the
+     * 2020–2021 list and whose variant is "." or blank. FAIL_QC and samples with no metadata row
+     * never count. A group with no 2020–2021 list contributes nothing.
+     * Defined term (D-54, narrowed by D-75/D-76): counting every "." sample was tried and reverted.
      *
      * @return array<int,int>
      */
@@ -931,14 +932,20 @@ if (!function_exists('nj_read_early_counts')) {
         }
         $check->free();
         $res = $con->query(
-            'SELECT e.group_id, COUNT(*) AS n
+            'SELECT e.group_id, COUNT(DISTINCT e.sample_name) AS n
                FROM vcf_snv_early_sample e
-               LEFT JOIN vcf_snv_sample_meta m
-                 ON m.group_id = e.group_id AND m.sample_name = e.sample_name
-              WHERE m.id IS NULL
-                 OR m.variant_label IS NULL
+               JOIN vcf_snv_nj_sample_list l
+                 ON l.group_id = e.group_id AND l.sample_name = e.sample_name
+               JOIN vcf_snv_sample s
+                 ON s.group_id = e.group_id AND s.sample_name = e.sample_name
+               JOIN vcf_snv_sample_eligibility el
+                 ON el.sample_id = s.id AND el.eligible = 1
+               JOIN vcf_snv_sample_meta m
+                 ON m.sample_id = s.id
+              WHERE m.qc = \'PASS\'
+                AND (m.variant_label IS NULL
                  OR TRIM(m.variant_label) = \'.\'
-                 OR TRIM(m.variant_label) = \'\'
+                 OR TRIM(m.variant_label) = \'\')
               GROUP BY e.group_id'
         );
         $out = [];
