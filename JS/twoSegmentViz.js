@@ -413,7 +413,7 @@
         alternate: String(snv.alternate || '').toUpperCase(),
         label: snv.label || (String(snv.reference || '') + coord + String(snv.alternate || '')),
         source: snv.source || 'original_mutations',
-        source_label: snv.source_label || 'Original mutations table (≥1%)'
+        source_label: snv.source_label || 'selected group (≥1%)'
       });
     });
     out.sort(function (a, b) {
@@ -430,7 +430,7 @@
     if (item.source === 'pango') {
       return label + ' — Pango designation marker';
     }
-    return label + ' — ' + (item.source_label || 'Original mutations table (≥1%)');
+    return label + ' — ' + (item.source_label || 'selected group (≥1%)');
   }
 
   function pangoMarkersForWindow(windowRange) {
@@ -712,7 +712,7 @@
     note.className = 'tsg-primer-direction-note';
     note.textContent = primerLayout() === 'compact'
       ? 'Compact view: pair numbers hidden. Each pair stays on its own stripe; non-overlapping pairs share a row. Pale lines connect LEFT/RIGHT mates; if a mate is offscreen the line runs to the edge of the track.'
-      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the Original mutations table (\u2265 1% of samples). Blue-gray dashed lines are published Pango designation markers.';
+      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers.';
     section.appendChild(note);
     container.appendChild(section);
   }
@@ -873,7 +873,7 @@
       renderBreakpointPanel(section, { id: 'snv' }, 'snv', coord, all, selected);
       var note = document.createElement('div');
       note.className = 'tsg-primer-direction-note';
-      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the Original mutations table (\u2265 1% of samples), not a VCF group. Blue-gray dashed lines are published Pango designation markers. Pale lines connect primer pairs; offscreen mates run to the edge of the track.';
+      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers. Pale lines connect primer pairs; offscreen mates run to the edge of the track.';
       section.appendChild(note);
       frag.appendChild(section);
     }

@@ -667,6 +667,7 @@
       var alt = row.getAttribute("data-alt");
       if (ref) { url += "&ref=" + encodeURIComponent(ref); }
       if (alt) { url += "&alt=" + encodeURIComponent(alt); }
+      url += vcfQuerySuffix();
       window.open(url, "_blank");
     }
 
@@ -1429,6 +1430,7 @@
           if (alt) { url += "&alt=" + encodeURIComponent(alt); }
           if (protein) { url += "&protein=" + encodeURIComponent(protein); }
           if (kind) { url += "&kind=" + encodeURIComponent(kind); }
+          url += vcfQuerySuffix();
           window.open(url, "_blank");
         });
 
