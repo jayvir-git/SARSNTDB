@@ -743,6 +743,8 @@
                 ]);
         CanvasJS.addColorSet("orangeShades", ['#df7970']);
         var mutationsChart = new CanvasJS.Chart("mutationsChart", {
+          exportEnabled: true,
+          exportFileName: "mutationsChart",
           title: {
             text: "Mutations by instrument"
           },
@@ -769,6 +771,8 @@
         });  
 
         var mutationsByFreqChart = new CanvasJS.Chart("mutationsByFreqChart", {
+          exportEnabled: true,
+          exportFileName: "mutationsByFreqChart",
           title: {
             text: "Mutations by frequency"
           },
@@ -812,6 +816,8 @@
         });  
         
         var mutationsShapeScoreChart = new CanvasJS.Chart("mutationsShapeScoreChart", {
+          exportEnabled: true,
+          exportFileName: "mutationsShapeScoreChart",
           title: {
             text: "RNA SHAPE Secondary Structure"
 
@@ -864,6 +870,8 @@
 
         // WT chart
         var mutationsShapeScoreChartWT = new CanvasJS.Chart("mutationsShapeScoreChartWT", {
+          exportEnabled: true,
+          exportFileName: "mutationsShapeScoreChartWT",
           title: {
             text: "RNA SHAPE Secondary Structure"
 
@@ -914,6 +922,8 @@
         
         // DELTA
         var mutationsShapeScoreChartDELTA = new CanvasJS.Chart("mutationsShapeScoreChartDELTA", {
+          exportEnabled: true,
+          exportFileName: "mutationsShapeScoreChartDELTA",
           title: {
             text: "RNA SHAPE Secondary Structure"
 
@@ -963,6 +973,8 @@
 
         // GSE153984
         var mutationsShapeScoreChartGSE153984 = new CanvasJS.Chart("mutationsShapeScoreChartGSE153984", {
+          exportEnabled: true,
+          exportFileName: "mutationsShapeScoreChartGSE153984",
           title: {
             text: "RNA SHAPE Secondary Structure"
 
