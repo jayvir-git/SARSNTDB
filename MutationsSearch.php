@@ -319,6 +319,30 @@
               <button type="button" class="btn btn-success" id="snvPairCompareBtn">Compare</button>
             </div>
           </div>
+          <div class="row mutation-search-row" id="snvGroupRow">
+            <div class="col-md-12">
+              <p class="mutation-search-label">Compare groups</p>
+              <p class="text-muted" style="font-size:12px;margin:0 0 8px 0;">SNVs in two or more groups, one column per group. Each percent is the share of analyzed samples in that group, at the minimum allele frequency above. Rel. % Diff appears only when exactly two groups are checked.</p>
+            </div>
+            <div class="col-md-8">
+              <div id="snvGroupChecks" style="max-height:140px;overflow:auto;border:1px solid #ddd;padding:4px 8px;background:#fff;">
+                <?php foreach ($vcfGroups as $vcfGroupRow) : ?>
+                <label style="display:block;font-weight:normal;margin:0;">
+                  <input type="checkbox" name="snvCompareGroup" value="<?php echo htmlspecialchars($vcfGroupRow['code'], ENT_QUOTES, 'UTF-8'); ?>" />
+                  <?php echo htmlspecialchars(vcf_snv_group_menu_label($vcfGroupRow), ENT_QUOTES, 'UTF-8'); ?>
+                </label>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <div class="col-md-2">
+              <label for="SnvGroupMinPercent">Min %</label>
+              <input id="SnvGroupMinPercent" type="number" class="form-control" min="0" max="100" step="0.01" value="1" />
+              <small class="text-muted field-hint">In any group</small>
+            </div>
+            <div class="col-md-2 search-field-actions">
+              <button type="button" class="btn btn-success" id="snvGroupCompareBtn">Compare</button>
+            </div>
+          </div>
           <?php endif; ?>
           
           <div class="row mutation-search-row">
@@ -638,6 +662,41 @@
         + "&MinPercent=" + encodeURIComponent(minPct ? minPct.value : "1")
         + "&Pair1=" + encodeURIComponent(pair1 ? pair1.value : "")
         + "&Pair2=" + encodeURIComponent(pair2 ? pair2.value : ""));
+      req.onload = function () {
+        result.innerHTML = req.status >= 200 && req.status < 300
+          ? req.responseText
+          : "<p class=\"text-muted\">The comparison did not load.</p>";
+      };
+      req.onerror = function () {
+        result.innerHTML = "<p class=\"text-muted\">The comparison did not load.</p>";
+      };
+      req.send();
+    }
+
+    // Group-vs-group SNV comparison (Jim, Zoom 2026-10-19, D-76); shares the pair comparison's result area.
+    function runSnvGroupCompare() {
+      var result = snvPairField("snvPairResult");
+      if (!result) {
+        return;
+      }
+      var codes = [];
+      var boxes = document.querySelectorAll('input[name="snvCompareGroup"]:checked');
+      for (var i = 0; i < boxes.length; i++) {
+        codes.push(boxes[i].value);
+      }
+      if (codes.length < 2) {
+        result.innerHTML = "<p class=\"text-muted\">Check at least two groups to compare.</p>";
+        return;
+      }
+      var minPct = snvPairField("SnvGroupMinPercent");
+      var query = "SnvGroupCompare.php?what=table&MinAf=" + encodeURIComponent(selectedMinAf())
+        + "&MinPercent=" + encodeURIComponent(minPct ? minPct.value : "1");
+      for (var j = 0; j < codes.length; j++) {
+        query += "&Groups[]=" + encodeURIComponent(codes[j]);
+      }
+      result.innerHTML = "<p class=\"text-muted\">Comparing " + codes.length + " groups…</p>";
+      var req = new XMLHttpRequest();
+      req.open("GET", query);
       req.onload = function () {
         result.innerHTML = req.status >= 200 && req.status < 300
           ? req.responseText
@@ -1050,6 +1109,10 @@
         var snvPairMergeEl = document.getElementById("SnvPairMergeDelta");
         if (snvPairMergeEl) {
           snvPairMergeEl.addEventListener("change", loadSnvPairChoices);
+        }
+        var snvGroupBtn = document.getElementById("snvGroupCompareBtn");
+        if (snvGroupBtn) {
+          snvGroupBtn.addEventListener("click", runSnvGroupCompare);
         }
         var snvPairBtn = document.getElementById("snvPairCompareBtn");
         if (snvPairBtn) {
