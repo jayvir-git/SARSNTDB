@@ -8,6 +8,10 @@
     $repeat = "";
     if(isset($_GET['repeat'])){
         $repeat = $_GET['repeat'];
+        // Repeats are DNA: U is read as T (Jim, 2026-10-19).
+        if (preg_match('/^[ACGTUacgtu]+$/', $repeat)) {
+            $repeat = str_replace('U', 'T', strtoupper($repeat));
+        }
         // echo ($repeat);
     }
     

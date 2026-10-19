@@ -148,6 +148,10 @@
     if(isset($_GET['repeat'])){
       //print_r($_POST['proteinData']);
       $repeatData = $_GET['repeat'];
+      // Repeats are DNA: U is read as T (Jim, 2026-10-19).
+      if (preg_match('/^[ACGTUacgtu]+$/', $repeatData)) {
+        $repeatData = str_replace('U', 'T', strtoupper($repeatData));
+      }
       $repeatExternal = 1;
     }else{
       $repeatData = "ACGAAC";
@@ -190,6 +194,7 @@
             <div class="col-md-2">
               <label for="motif">Enter a Repeat</label>
               <input id="motif" type="text" class="form-control" id="motif" value=<?php echo $repeatData ?> />
+              <small class="text-muted">Use only A, T, G and C. A U is read as T.</small>
             </div>
       
         
@@ -411,6 +416,8 @@
       resetForm()
       
       // container.innerHTML = '';
+      // Repeats are DNA: U is read as T (Jim, 2026-10-19).
+      document.getElementById("motif").value = document.getElementById("motif").value.trim().toUpperCase().replace(/U/g, "T");
       var repeat = document.getElementById("motif").value;
       
       if (repeat.length<6){

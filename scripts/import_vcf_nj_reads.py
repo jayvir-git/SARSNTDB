@@ -21,6 +21,8 @@ from import_vcf_snv_groups import mysql_run, parse_connection_php, sql_str
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_nj.sql"
+# Samples with no junction reads in any _coord file are not analyzed (Jim, 2026-10-19).
+NO_NJ_READS_SQL = ROOT / "sql" / "vcf_snv_no_nj_reads.sql"
 DRIVE = ROOT / "_incoming" / "jim-kelley" / "2026-09-22_nj-reads-many-projects" / "drive"
 # Reads the gitignored packet copy of the catalog; moving that packet breaks the import silently.
 CATALOG = ROOT / "_incoming" / "jim-kelley" / "2026-09-23_nj-on-junction-page" / "files" / "NJ-table_no_types.csv"
@@ -341,6 +343,7 @@ def apply_list_eligibility(cfg: dict, gid: int) -> None:
         "WHERE e.group_id = " + str(gid),
         cfg,
     )
+    mysql_run(NO_NJ_READS_SQL.read_text(encoding="utf-8"), cfg)
 
 
 def sra_ids_from_csv(path: Path) -> list[str]:
