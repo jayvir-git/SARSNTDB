@@ -785,7 +785,7 @@ if (!function_exists('vcf_snv_overlay_group_select')) {
     function vcf_snv_overlay_group_select(mysqli $con, $selectedCode)
     {
         $html = '<select name="Group" class="form-control input-sm" style="display:inline-block; width:auto;" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }">';
-        foreach (vcf_snv_fetch_groups($con) as $row) {
+        foreach (vcf_snv_groups_with_min_samples(vcf_snv_fetch_groups($con)) as $row) {
             $code = (string) $row['code'];
             $html .= '<option value="' . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . '"'
                 . ($code === (string) $selectedCode ? ' selected' : '') . '>'
@@ -793,5 +793,21 @@ if (!function_exists('vcf_snv_overlay_group_select')) {
         }
 
         return $html . '</select>';
+    }
+}
+
+if (!function_exists('vcf_snv_groups_with_min_samples')) {
+    /**
+     * SNV groups with at least $min analyzed samples; smaller groups are left off the menus
+     * (Jim, Zoom 2026-10-19, D-76).
+     *
+     * @param list<array<string,mixed>> $groups
+     * @return list<array<string,mixed>>
+     */
+    function vcf_snv_groups_with_min_samples(array $groups, $min = 20)
+    {
+        return array_values(array_filter($groups, function ($row) use ($min) {
+            return (int) $row['sample_count'] >= $min;
+        }));
     }
 }

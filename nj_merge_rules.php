@@ -1209,3 +1209,37 @@ if (!function_exists('nj_read_csv_line')) {
         return implode(',', $out);
     }
 }
+
+if (!function_exists('nj_read_groups_with_min_pair')) {
+    /**
+     * Groups that show data at a minimum of $min samples: at least one shown variant-primer
+     * cell with $min or more analyzed samples. Others only ever show -1, so they are left off
+     * (Jim, Zoom 2026-10-19: keep a group if it shows data when the minimum is lowered to 20; D-76).
+     *
+     * @param list<array<string,mixed>> $groups
+     * @param array<int,array<string,array<string,int>>> $denoms nj_read_pair_denoms() at min reads 1, N-gene filter on
+     * @return list<array<string,mixed>>
+     */
+    function nj_read_groups_with_min_pair(array $groups, array $denoms, $min = 20)
+    {
+        $out = [];
+        foreach ($groups as $group) {
+            $keep = false;
+            foreach ((isset($denoms[(int) $group['id']]) ? $denoms[(int) $group['id']] : []) as $variant => $byPrimer) {
+                $variant = (string) $variant;
+                if ($variant === '.' || $variant === '' || nj_read_variant_is_hidden($variant)) {
+                    continue;
+                }
+                if ($byPrimer && max($byPrimer) >= $min) {
+                    $keep = true;
+                    break;
+                }
+            }
+            if ($keep) {
+                $out[] = $group;
+            }
+        }
+
+        return $out;
+    }
+}
