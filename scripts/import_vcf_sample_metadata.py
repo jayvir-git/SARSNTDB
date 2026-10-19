@@ -58,6 +58,15 @@ GROUP_PROJECT = {
     "VA": "PRJNA625551",
     "Austr-PRJNA613958_nextseq500": "PRJNA613958",
     "Austr-PRJNA613958_nextseq550": "PRJNA613958",
+    # 19 Oct: groups whose variant-primer files Jim uploaded after the Zoom.
+    "PRJNA788338_Mauritius": "PRJNA788338",
+    "PRJNA718451-Mozambique": "PRJNA718451",
+    "PRJNA728463-Israel": "PRJNA728463",
+    "PRJEB46969-Lebanon": "PRJEB46969",
+    "PRJNA708134-Philippines": "PRJNA708134",
+    "PRJEB70597_Vietnam": "PRJEB70597",
+    "PRJEB70597_Chile": "PRJEB70597",
+    "Russia682735": "PRJNA682735",
 }
 
 EXTRA_META_FILES = {
@@ -103,6 +112,14 @@ DISPLAY_LABELS = {
     "Austr-PRJNA613958_nextseq550": "Australia NextSeq 550 PRJNA613958",
     "illumina_hiseq_2500": "United Kingdom HiSeq 2500 PRJEB37886",
     "Est-mix": "Estonia many #s",
+    "PRJNA788338_Mauritius": "Mauritius MiSeq PRJNA788338",
+    "PRJNA718451-Mozambique": "Mozambique MiSeq PRJNA718451",
+    "PRJNA728463-Israel": "Israel MiSeq PRJNA728463",
+    "PRJEB46969-Lebanon": "Lebanon NextSeq 550 PRJEB46969",
+    "PRJNA708134-Philippines": "Philippines NovaSeq 6000 PRJNA708134",
+    "PRJEB70597_Vietnam": "Vietnam Illumina PRJEB70597",
+    "PRJEB70597_Chile": "Chile Illumina PRJEB70597",
+    "Russia682735": "Russia HiSeq 2500 PRJNA682735",
 }
 
 OCT12_META_DIR = (
@@ -120,6 +137,19 @@ OCT12_META_FILES = {
     "run_metadata.v05-PRJNA622837.csv": "PRJNA622837",
     "run_metadata.v05-PRJEB37886.csv": "PRJEB37886",
     "run_metadata_Estonia_primers.csv": "Estonia",
+}
+
+
+# 19 Oct: run_metadata files Jim uploaded after the Zoom (staged in that packet).
+OCT19_META_DIR = ROOT / "_incoming" / "jim-kelley" / "2026-10-19_zoom-early-groups" / "staging" / "files"
+OCT19_META_FILES = {
+    "run_metadata.v05-PRJNA788338.csv": "PRJNA788338",
+    "run_metadata.v05-PRJNA718451.csv": "PRJNA718451",
+    "run_metadata.v05-PRJNA728463.csv": "PRJNA728463",
+    "run_metadata.v05-PRJEB46969.csv": "PRJEB46969",
+    "run_metadata.v05-PRJNA708134.csv": "PRJNA708134",
+    "run_metadata.v05-PRJEB70597.csv": "PRJEB70597",
+    "run_metadata.v05-PRJNA682735.csv": "PRJNA682735",
 }
 
 
@@ -256,14 +286,19 @@ def stream_metadata(wanted_names: set[str]) -> dict[str, dict[str, str]]:
 
 
 def _stream_oct12(hits: dict[str, dict[str, str]], wanted_names: set[str]) -> dict[str, dict[str, str]]:
-    if OCT12_META_DIR.is_dir():
-        for path in OCT12_META_DIR.glob("*.csv"):
-            project = OCT12_META_FILES.get(path.name)
+    for meta_dir, meta_files in ((OCT12_META_DIR, OCT12_META_FILES), (OCT19_META_DIR, OCT19_META_FILES)):
+        _stream_meta_dir(hits, wanted_names, meta_dir, meta_files)
+    return hits
+
+
+def _stream_meta_dir(hits, wanted_names, meta_dir: Path, meta_files: dict[str, str]) -> None:
+    if meta_dir.is_dir():
+        for path in meta_dir.glob("*.csv"):
+            project = meta_files.get(path.name)
             if project is None:
                 continue
             with path.open(newline="", encoding="utf-8", errors="replace") as fh:
                 absorb_metadata_rows(hits, csv.reader(fh), project, path.name, wanted_names)
-    return hits
 
 
 def build_rows(

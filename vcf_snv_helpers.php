@@ -70,6 +70,14 @@ if (!function_exists('vcf_snv_workbook_visible_codes')) {
             'India-miseq',
             'Thailand_mix',
             'Est-mix',
+            'PRJNA788338_Mauritius',
+            'PRJNA718451-Mozambique',
+            'PRJNA728463-Israel',
+            'PRJEB46969-Lebanon',
+            'PRJNA708134-Philippines',
+            'PRJEB70597_Vietnam',
+            'PRJEB70597_Chile',
+            'Russia682735',
         ];
     }
 }
@@ -121,6 +129,14 @@ if (!function_exists('vcf_snv_group_display_label')) {
             'Austr-PRJNA613958_nextseq550' => 'Australia NextSeq 550 PRJNA613958',
             'Thailand_mix' => 'Thailand many #s',
             'Est-mix' => 'Estonia many #s',
+            'PRJNA788338_Mauritius' => 'Mauritius MiSeq PRJNA788338',
+            'PRJNA718451-Mozambique' => 'Mozambique MiSeq PRJNA718451',
+            'PRJNA728463-Israel' => 'Israel MiSeq PRJNA728463',
+            'PRJEB46969-Lebanon' => 'Lebanon NextSeq 550 PRJEB46969',
+            'PRJNA708134-Philippines' => 'Philippines NovaSeq 6000 PRJNA708134',
+            'PRJEB70597_Vietnam' => 'Vietnam Illumina PRJEB70597',
+            'PRJEB70597_Chile' => 'Chile Illumina PRJEB70597',
+            'Russia682735' => 'Russia HiSeq 2500 PRJNA682735',
         ];
         $code = (string) $code;
         if (isset($labels[$code])) {
