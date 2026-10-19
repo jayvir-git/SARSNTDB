@@ -6,6 +6,7 @@
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/two_segment_helpers.php';
 require_once __DIR__ . '/snv_pango_helpers.php';
+require_once __DIR__ . '/vcf_snv_helpers.php';
 
 $rows = [];
 $dbError = null;
@@ -18,6 +19,8 @@ $primersByStructure = [];
 $primerLayout = (isset($_GET['layout']) && $_GET['layout'] === 'compact') ? 'compact' : 'detailed';
 $showNearbySnvs = !(isset($_GET['nearby']) && (string) $_GET['nearby'] === '0');
 $overlaySnvs = [];
+$overlayGroup = vcf_snv_overlay_group_code();
+$overlayMinAf = vcf_snv_request_min_af();
 $pangoOverlay = [];
 
 if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
@@ -78,7 +81,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     } else {
         $primerDbError = 'Primer-arrow tables are not installed. Import sql/primer_arrows.sql.';
     }
-    $overlaySnvs = snv_overlay_variants($con, 1.0);
+    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, 1.0);
     $pangoOverlay = pango_overlay_markers($con);
 }
 ?>
@@ -144,7 +147,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
         <?php endif; ?>
 
         <?php if ($primerSchemes) : ?>
-        <form method="get" class="tsg-scheme-picker" style="max-width:900px;">
+        <form method="get" class="tsg-scheme-picker" id="tsgSchemeForm" style="max-width:900px;">
             <input type="hidden" name="schemes_submitted" value="1" />
             <?php foreach (['id', 'ids', 'left', 'right'] as $keepKey) : ?>
                 <?php if (isset($_GET[$keepKey]) && !is_array($_GET[$keepKey])) : ?>
@@ -170,8 +173,10 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             <span class="tsg-nearby-toggle">
                 <label class="checkbox-inline">
                     <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
-                    Show nearby SNVs (Original table ≥1%; Pango markers dashed)
+                    Show nearby SNVs (≥1%; Pango markers dashed) from
                 </label>
+                <?php echo vcf_snv_overlay_group_select($con, $overlayGroup); ?>
+                <input type="hidden" name="MinAf" value="<?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>" />
             </span>
             <span class="help-block" style="margin-bottom:0;">
                 The full-junction track is an overview. Primer arrows appear only in separate left/right
@@ -254,10 +259,19 @@ window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261019-png"></script>
+<script src="JS/twoSegmentViz.js?v=20261019-nearby"></script>
 <script>
 (function ($) {
     $(function () {
+        // Keep the checked structures when the scheme form reloads the page (Apply or a new nearby-SNV group).
+        $('#tsgSchemeForm').on('submit', function () {
+            var checked = $('input[name="tsg_sel[]"]:checked').map(function () { return this.value; }).get();
+            var form = $(this);
+            form.find('input[name="id"], input[name="ids"], input[name="left"], input[name="right"]').remove();
+            if (checked.length) {
+                $('<input type="hidden" name="ids" />').val(checked.join(',')).appendTo(form);
+            }
+        });
         var params = new URLSearchParams(window.location.search);
         var raw = params.get('id') || params.get('ids');
         if (!window.TwoSegmentViz) {

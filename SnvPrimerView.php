@@ -6,6 +6,7 @@
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/two_segment_helpers.php';
 require_once __DIR__ . '/snv_pango_helpers.php';
+require_once __DIR__ . '/vcf_snv_helpers.php';
 
 $coord = 0;
 if (isset($_GET['coord']) && is_numeric($_GET['coord'])) {
@@ -22,6 +23,9 @@ if (isset($_GET['primer']) && ctype_digit((string) $_GET['primer'])) {
 }
 
 $primerWindow = 800;
+$overlayGroup = vcf_snv_overlay_group_code();
+$overlayMinAf = vcf_snv_request_min_af();
+$overlayGroupLabel = '';
 $primerLayout = (isset($_GET['layout']) && $_GET['layout'] === 'compact') ? 'compact' : 'detailed';
 $primerSchemes = [];
 $selectedPrimerSchemes = [];
@@ -37,7 +41,10 @@ $primerDbError = null;
 if ($coord < 1 || $coord > 29903) {
     $dbError = 'Pass a genome coordinate in ?coord= (1–29903). Example: SnvPrimerView.php?coord=23202';
 } elseif (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
-    $overlaySnvs = snv_overlay_variants($con, 1.0);
+    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, 1.0,
+        max(1, $coord - $primerWindow), min(29903, $coord + $primerWindow));
+    $overlayGroupRow = vcf_snv_group_row($con, $overlayGroup);
+    $overlayGroupLabel = $overlayGroupRow !== null ? (string) $overlayGroupRow['label'] : '';
     $pangoOverlay = pango_overlay_markers($con);
     if ($variantKind === 'indel') {
         if ($refBase !== '' && $altBase !== '') {
@@ -121,7 +128,8 @@ foreach ($snvPrimers as $primer) {
             Primers whose start or end is within <strong>&plusmn;<?php echo (int) $primerWindow; ?> nt</strong>
             of this <?php echo $variantKind === 'indel' ? 'indel' : 'SNV'; ?>
             (same window idea as junction primer arrows).
-            Pale dotted lines are other SNVs from the Original mutations table (John; ≥1% of 18,900 samples), not the selected VCF group.
+            Pale dotted lines are other SNVs in <strong><?php echo htmlspecialchars($overlayGroupLabel !== '' ? $overlayGroupLabel : $overlayGroup, ENT_QUOTES, 'UTF-8'); ?></strong>
+            (≥1% of analyzed samples, AF ≥ <?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>); change the group below.
             Blue-gray dashed lines are published Pango designation markers in the window.
             See the <a href="PangoMarkers.php">Pango markers</a> page for the full tables.
             <a href="MutationsSearch.php">Back to Mutations search</a>.
@@ -204,8 +212,10 @@ foreach ($snvPrimers as $primer) {
             <span class="tsg-nearby-toggle">
                 <label class="checkbox-inline">
                     <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
-                    Show nearby SNVs (Original table ≥1%; Pango markers dashed)
+                    Show nearby SNVs (≥1%; Pango markers dashed) from
                 </label>
+                <?php echo vcf_snv_overlay_group_select($con, $overlayGroup); ?>
+                <input type="hidden" name="MinAf" value="<?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>" />
             </span>
             <?php if ($primersByScheme) : ?>
             <div class="tsg-primer-select-row">
@@ -248,7 +258,7 @@ window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261019-png"></script>
+<script src="JS/twoSegmentViz.js?v=20261019-nearby"></script>
 <script>
 (function () {
     var sel = document.getElementById('tsgPrimerSelect');

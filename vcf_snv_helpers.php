@@ -721,3 +721,77 @@ if (!function_exists('vcf_snv_group_series_points')) {
         return $points;
     }
 }
+
+if (!function_exists('vcf_snv_overlay_group_code')) {
+    /**
+     * Group for the nearby-SNV overlay: ?Group= when it names a loaded group, else the default.
+     */
+    function vcf_snv_overlay_group_code()
+    {
+        $code = vcf_snv_request_group();
+
+        return $code !== '' ? $code : vcf_snv_default_group_code();
+    }
+}
+
+if (!function_exists('vcf_snv_overlay_variants')) {
+    /**
+     * Nearby SNVs for primer views from one VCF group, never John's Original table (Jim, Zoom 2026-10-19, D-76).
+     * Same counting as Mutations Detail: share of analyzed samples at allele frequency >= $minAf,
+     * kept at >= $minPercent (1% floor, D-23). Single-base changes only.
+     *
+     * @return list<array{coordinate:int,reference:string,alternate:string,label:string,source:string,source_label:string}>
+     */
+    function vcf_snv_overlay_variants(mysqli $con, $groupCode, $minAf, $minPercent = 1.0, $start = '', $end = '')
+    {
+        $out = [];
+        $pack = vcf_snv_detail_pack($con, $groupCode, $minAf, $start, $end, '');
+        if ($pack === null || (int) $pack['sample_count'] < 1) {
+            return $out;
+        }
+        $total = (int) $pack['sample_count'];
+        $sourceLabel = $pack['group_label'] . ' (≥' . rtrim(rtrim(number_format((float) $minPercent, 2, '.', ''), '0'), '.')
+            . '% of ' . $total . ' analyzed samples, AF ≥ ' . $minAf . ')';
+        $seen = [];
+        foreach ($pack['rows'] as $row) {
+            $ref = strtoupper((string) $row['reference']);
+            $alt = strtoupper((string) $row['alternate']);
+            if (strlen($ref) !== 1 || strlen($alt) !== 1) {
+                continue;
+            }
+            $key = $row['coordinate'] . $ref . $alt;
+            if (isset($seen[$key]) || ((int) $row['no_of_samples'] / $total) * 100 < (float) $minPercent) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = [
+                'coordinate' => (int) $row['coordinate'],
+                'reference' => $ref,
+                'alternate' => $alt,
+                'label' => snv_pango_format_label($row['coordinate'], $ref, $alt),
+                'source' => 'vcf_group',
+                'source_label' => $sourceLabel,
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('vcf_snv_overlay_group_select')) {
+    /**
+     * <select name="Group"> of visible VCF groups for the primer views.
+     */
+    function vcf_snv_overlay_group_select(mysqli $con, $selectedCode)
+    {
+        $html = '<select name="Group" class="form-control input-sm" style="display:inline-block; width:auto;" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }">';
+        foreach (vcf_snv_fetch_groups($con) as $row) {
+            $code = (string) $row['code'];
+            $html .= '<option value="' . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . '"'
+                . ($code === (string) $selectedCode ? ' selected' : '') . '>'
+                . htmlspecialchars((string) $row['label'], ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+
+        return $html . '</select>';
+    }
+}

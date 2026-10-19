@@ -199,6 +199,7 @@ error_reporting(E_ALL);
         if (alt) { url += '&alt=' + encodeURIComponent(alt); }
         if (protein) { url += '&protein=' + encodeURIComponent(protein); }
         if (kind) { url += '&kind=' + encodeURIComponent(kind); }
+        url += <?php echo json_encode('&Group=' . rawurlencode(vcf_snv_overlay_group_code()) . '&MinAf=' . rawurlencode((string) vcf_snv_request_min_af())); ?>;
         window.open(url, '_blank');
       });
     </script>
