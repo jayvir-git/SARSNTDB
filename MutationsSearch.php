@@ -210,7 +210,7 @@
 <?php
   require_once('./connection.php');
   require_once __DIR__ . '/nj_read_helpers.php';
-  $vcfGroups = vcf_snv_fetch_groups($con);
+  $vcfGroups = vcf_snv_groups_with_min_samples(vcf_snv_fetch_groups($con));
   $vcfDefaultGroup = '';
   foreach ($vcfGroups as $vcfGroupRow) {
     if ($vcfGroupRow['code'] === vcf_snv_default_group_code()) {

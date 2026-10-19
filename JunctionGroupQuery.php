@@ -104,6 +104,19 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
         }
     }
     $vcfGroups = vcf_snv_fetch_groups($con);
+    $njMinReads = nj_read_request_min_reads();
+    $njWantNgene = nj_read_request_ngene();
+    $njAllIds = [];
+    foreach ($vcfGroups as $vcfGroupRow) {
+        $njAllIds[] = (int) $vcfGroupRow['id'];
+    }
+    $njAllNgene = $njWantNgene ? nj_read_ngene_group_ids($con, $njAllIds) : [];
+    $njAllDenoms = nj_read_pair_denoms($con, $njAllIds, $njMinReads, $njAllNgene);
+    // Which groups to show is judged at the defaults (min reads 1, N-gene filter on), so it does not change with the boxes.
+    $njShowDenoms = ($njMinReads === 1 && $njWantNgene)
+        ? $njAllDenoms
+        : nj_read_pair_denoms($con, $njAllIds, 1, nj_read_ngene_group_ids($con, $njAllIds));
+    $vcfGroups = nj_read_groups_with_min_pair($vcfGroups, $njShowDenoms, 20);
     $njKeep = nj_read_request_keep();
     $njOptions = nj_read_request_merge_options();
     $njVisibleGroups = $vcfGroups;
@@ -139,14 +152,6 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     }
     $njChoices = nj_read_breakdown_choices(nj_read_label_pairs($con, $njGroupIds), $njBy, $njOptions);
     $njSelectedCols = nj_read_request_columns($njChoices);
-    $njAllIds = [];
-    foreach ($vcfGroups as $vcfGroupRow) {
-        $njAllIds[] = (int) $vcfGroupRow['id'];
-    }
-    $njMinReads = nj_read_request_min_reads();
-    $njWantNgene = nj_read_request_ngene();
-    $njAllNgene = $njWantNgene ? nj_read_ngene_group_ids($con, $njAllIds) : [];
-    $njAllDenoms = nj_read_pair_denoms($con, $njAllIds, $njMinReads, $njAllNgene);
     $njEarlyCounts = nj_read_early_counts($con);
     $njNgeneIds = $njWantNgene ? array_values(array_intersect($njAllNgene, $njGroupIds)) : [];
     $njDenoms = [];
