@@ -623,6 +623,38 @@
     container.appendChild(row);
   }
 
+  // PNG export of a rendered figure (Jim, Zoom 2026-10-19). The button itself is left out of the image.
+  function addPngButton(target, fileName) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-default btn-xs tsg-png-btn';
+    btn.textContent = 'Download PNG';
+    btn.style.cssFloat = 'right';
+    btn.style.marginLeft = '8px';
+    btn.addEventListener('click', function () {
+      // html-to-image lets the browser render the panel, so color-mix() connectors keep their colours.
+      if (!global.htmlToImage) {
+        alert('PNG export could not load. Check the network connection and reload the page.');
+        return;
+      }
+      global.htmlToImage.toPng(target, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        filter: function (node) {
+          return !(node.classList && node.classList.contains('tsg-png-btn'));
+        }
+      }).then(function (dataUrl) {
+        var link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    });
+    target.insertBefore(btn, target.firstChild);
+  }
+
   function renderBreakpointPanel(container, entry, breakpointKind, breakpoint, all, selected) {
     var windowRange = breakpointWindow(breakpoint);
     var panel = document.createElement('div');
@@ -651,6 +683,8 @@
       });
       renderSchemeBreakpointRow(panel, scheme, primers, windowRange, breakpointKind);
     });
+    addPngButton(panel, (breakpointKind === 'snv' ? 'snv' : 'structure_' + entry.id + '_' + breakpointKind) +
+      '_' + breakpoint + '_primers.png');
     container.appendChild(panel);
   }
 
@@ -757,6 +791,7 @@
       block.appendChild(warn);
     }
 
+    addPngButton(block, 'structure_' + entry.id + '.png');
     container.appendChild(block);
   }
 
