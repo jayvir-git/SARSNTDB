@@ -33,6 +33,15 @@ NGENE_SIZE = 28190
 
 # Longest base first when matching filenames.
 NJ_BASES = [
+    # 19 Oct groups (prefixes from the groups sheet; Israel files carry the underscore).
+    ("PRJNA708134-Philippines_", "PRJNA708134-Philippines"),
+    ("PRJNA718451-Mozambique_", "PRJNA718451-Mozambique"),
+    ("PRJNA788338_Mauritius_", "PRJNA788338_Mauritius"),
+    ("PRJNA728463-Israel_", "PRJNA728463-Israel"),
+    ("PRJEB46969-Lebanon_", "PRJEB46969-Lebanon"),
+    ("PRJEB70597_Vietnam_", "PRJEB70597_Vietnam"),
+    ("PRJEB70597_Chile_", "PRJEB70597_Chile"),
+    ("Rus_hiseq2500_", "Russia682735"),
     ("Argentina-uniq-all_", "PRJEB46220-Argentina"),
     ("SAfr_miseq_0325_", "S_Afr-PRJNA636748"),
     ("India_6000_all_", "India-6000"),
@@ -65,6 +74,14 @@ NJ_BASES = [
 ]
 
 LIST_FILES = {
+    "PRJNA788338_Mauritius_unique_csv.txt": "PRJNA788338_Mauritius",
+    "PRJNA718451-Mozambique_unique_csv.txt": "PRJNA718451-Mozambique",
+    "PRJNA728463-Israel_unique_csv.txt": "PRJNA728463-Israel",
+    "Lebanon_unique_csv.txt": "PRJEB46969-Lebanon",
+    "PRJNA708134-Philippines_unique_csv.txt": "PRJNA708134-Philippines",
+    "PRJEB70597_Vietman_unique_csv.txt": "PRJEB70597_Vietnam",
+    "PRJEB70597_Chile_unique_csv.txt": "PRJEB70597_Chile",
+    "Russia_hiseq2500_unique_csv.txt": "Russia682735",
     "Ang_miseq_unique_csv.txt": "Angola_miseq",
     "Argentina_all_unique_csv.txt": "PRJEB46220-Argentina",
     "Botswana_unique_csv.txt": "Botswana",

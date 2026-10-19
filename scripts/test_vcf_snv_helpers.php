@@ -29,7 +29,7 @@ expect(vcf_snv_group_is_visible('PRJEB46220-Argentina') === true, 'Argentina vis
 expect(vcf_snv_group_is_visible('Angola_miseq') === true, 'Angola visible');
 expect(vcf_snv_group_is_visible('India-miseq') === true, 'India MiSeq visible');
 expect(vcf_snv_group_is_visible('Port_miseq') === true, 'Portugal MiSeq visible');
-expect(vcf_snv_group_is_visible('Russia682735') === false, 'Russia hidden');
+expect(vcf_snv_group_is_visible('Russia682735') === true, 'Russia visible now that its metadata arrived (2026-10-19)');
 expect(vcf_snv_group_is_visible('NM') === true, 'New Mexico visible');
 expect(vcf_snv_group_is_visible('VA') === true, 'Virginia visible');
 expect(vcf_snv_group_display_label('NM', '') === 'USA NM MiSeq PRJNA656534', 'New Mexico label');

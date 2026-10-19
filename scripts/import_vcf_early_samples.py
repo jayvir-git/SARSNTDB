@@ -66,6 +66,13 @@ EARLY_BY_CODE = {
     "Austr-PRJNA613958_nextseq550": "Austr-PRJNA613958_nextseq_550_2020_samples.txt",
     "Russia682735": "Russia682735_hiseq_2500.txt",
     "LA-PRJNA815364_nextseq500": "LA_nextseq500-2020-Jul21.txt",
+    "PRJNA788338_Mauritius": "PRJNA788338_Mauritius_2020-2021.txt",
+    "PRJNA718451-Mozambique": "PRJNA718451-Mozambique_2020-2021.txt",
+    "PRJNA728463-Israel": "PRJNA728463-Israel_2020-2021.txt",
+    "PRJEB46969-Lebanon": "Lebanon_2020-2021.txt",
+    "PRJNA708134-Philippines": "PRJNA708134-Philippines_2020-2021.txt",
+    "PRJEB70597_Vietnam": "PRJEB70597_2020-2021.txt",
+    "PRJEB70597_Chile": "PRJEB70597_2020-2021.txt",
 }
 
 
@@ -111,6 +118,12 @@ def main() -> None:
     if EARLY_DIR.is_dir():
         for path in EARLY_DIR.glob("*.txt"):
             lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
+    # 19 Oct groups: Early lists staged in that packet.
+    oct19 = ROOT / "_incoming" / "jim-kelley" / "2026-10-19_zoom-early-groups" / "staging" / "files"
+    if oct19.is_dir():
+        for path in oct19.glob("*.txt"):
+            lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
+            lists[path.stem] = lists[path.name]
     if OCT12_EARLY_DIR.is_dir():
         for path in OCT12_EARLY_DIR.glob("*.txt"):
             lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
