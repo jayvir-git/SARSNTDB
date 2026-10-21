@@ -600,6 +600,111 @@ if (!function_exists('nj_read_summary_rows')) {
     }
 }
 
+if (!function_exists('nj_read_group_column_cells')) {
+    /**
+     * One group's numerator and denominator per chosen column, from the pair denominators and junction hits.
+     * Same counting as nj_read_fold_breakdown on nj_read_breakdown_raw rows.
+     *
+     * @param array<string,array<string,int>> $groupDenoms variant => primer => samples
+     * @param array<string,array<string,int>> $groupHits variant => primer => samples with the junction
+     * @param list<string> $columnKeys
+     * @param array<string,mixed> $options
+     * @return array<string,array{n:int,d:int}>
+     */
+    function nj_read_group_column_cells(array $groupDenoms, array $groupHits, array $columnKeys, $by, array $options)
+    {
+        $opt = nj_read_coerce_merge($options);
+        $minSamples = (int) $opt['min_samples'];
+        $showBelow = !empty($opt['show_below']);
+        $want = array_fill_keys($columnKeys, true);
+        $cells = [];
+        foreach ($groupDenoms as $variant => $primers) {
+            foreach ($primers as $primer => $count) {
+                $count = (int) $count;
+                $col = nj_read_column_key($variant, $primer, $by, $opt);
+                if ($col === null || !isset($want[$col])) {
+                    continue;
+                }
+                if (!$showBelow && $minSamples > 0 && $count < $minSamples) {
+                    continue;
+                }
+                if (!isset($cells[$col])) {
+                    $cells[$col] = ['n' => 0, 'd' => 0];
+                }
+                $cells[$col]['d'] += $count;
+                $cells[$col]['n'] += isset($groupHits[$variant][$primer]) ? (int) $groupHits[$variant][$primer] : 0;
+            }
+        }
+
+        return $cells;
+    }
+}
+
+if (!function_exists('nj_read_summary_column_rows')) {
+    /**
+     * Summary rows whose columns are the variant-primer pairs (or variants, or primers) checked in the box,
+     * averaged over the selected groups, plus Overall (Jim, Zoom 2026-10-21, D-81).
+     *
+     * @param list<array{nj_size:int,coord_tag:string,nj_start:?int,nj_end:?int}> $catalog
+     * @param list<int> $groupIds
+     * @param array<int,array<string,array<string,int>>> $denoms
+     * @param array{pairs:array,overall:array} $hits
+     * @param list<string> $columnKeys
+     * @param array<string,mixed> $options
+     * @return list<array<string,mixed>>
+     */
+    function nj_read_summary_column_rows(array $catalog, array $groupIds, array $denoms, array $hits, array $columnKeys, $by, array $options)
+    {
+        $opt = nj_read_coerce_merge($options);
+        $min = (int) $opt['min_samples'];
+        $showBelow = !empty($opt['show_below']);
+        $rows = [];
+        foreach ($catalog as $row) {
+            $key = (int) $row['nj_size'] . '|' . (string) $row['coord_tag'];
+            $percents = array_fill_keys($columnKeys, []);
+            $overall = [];
+            foreach ($groupIds as $gid) {
+                $gid = (int) $gid;
+                $groupDenoms = isset($denoms[$gid]) ? $denoms[$gid] : [];
+                $groupHits = isset($hits['pairs'][$key][$gid]) ? $hits['pairs'][$key][$gid] : [];
+                $cells = nj_read_group_column_cells($groupDenoms, $groupHits, $columnKeys, $by, $opt);
+                foreach ($columnKeys as $col) {
+                    $cell = isset($cells[$col]) ? $cells[$col] : ['n' => 0, 'd' => 0];
+                    $percents[$col][] = ($cell['d'] < 1 || (!$showBelow && $min > 0 && $cell['d'] < $min))
+                        ? null
+                        : nj_read_percent($cell['n'], $cell['d']);
+                }
+                $denom = 0;
+                foreach ($groupDenoms as $primers) {
+                    foreach ($primers as $count) {
+                        $denom += (int) $count;
+                    }
+                }
+                if ($denom < 1 || (!$showBelow && $min > 0 && $denom < $min)) {
+                    $overall[] = null;
+                    continue;
+                }
+                $num = isset($hits['overall'][$key][$gid]) ? (int) $hits['overall'][$key][$gid] : 0;
+                $overall[] = nj_read_percent($num, $denom);
+            }
+            $out = [
+                'nj_size' => (int) $row['nj_size'],
+                'coord_tag' => (string) $row['coord_tag'],
+                'nj_start' => $row['nj_start'],
+                'nj_end' => $row['nj_end'],
+                'cols' => [],
+            ];
+            foreach ($columnKeys as $col) {
+                $out['cols'][$col] = nj_read_average_text($percents[$col]);
+            }
+            $out['overall'] = nj_read_average_text($overall);
+            $rows[] = $out;
+        }
+
+        return $rows;
+    }
+}
+
 if (!function_exists('nj_read_variant_totals')) {
     /**
      * @param array<string,array<string,int>> $denoms

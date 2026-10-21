@@ -162,10 +162,14 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     }
     $njHits = nj_read_junction_hits($con, $njGroupIds, $njMinReads, $njNgeneIds);
     $njCatalog = nj_read_catalog_rows($con);
-    $njSummary = nj_read_summary_rows($njCatalog, $njGroupIds, $njDenoms, $njHits, $njOptions);
+    // Summary columns follow the checked pairs (Jim, Zoom 2026-10-21, D-81).
+    $njSummary = nj_read_summary_column_rows($njCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
     // Click a Canonical Junction (Jim, 2026-10-21, D-80): same hits and denominators, canonical catalog rows.
     $cjCatalog = nj_read_catalog_rows($con, 'cj');
-    $cjSummary = nj_read_summary_rows($cjCatalog, $njGroupIds, $njDenoms, $njHits, $njOptions);
+    $cjSummary = nj_read_summary_column_rows($cjCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
+    // Click a TRS-L Dependent Junction (Jim, Zoom 2026-10-21, D-81); groups without its files show -1.
+    $tlCatalog = nj_read_catalog_rows($con, 'tl');
+    $tlSummary = nj_read_summary_column_rows($tlCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
     $njChartNames = nj_read_chart_group_names($njGroupCodes);
 } else {
     $dbError = 'Database connection not available.';
@@ -177,6 +181,8 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $njCatalog = [];
     $cjSummary = [];
     $cjCatalog = [];
+    $tlSummary = [];
+    $tlCatalog = [];
     $njChartNames = [];
 }
 
@@ -374,14 +380,18 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     }
     $csvCodes = jq_group_codes($njGroupRows);
     $csvReady = $njSelectedCols && $njGroupRows;
-    // cjjunctions, cjbreakdown and cjsummary are the Click a Canonical Junction downloads.
-    $csvCanonical = in_array($csvKind, ['cjjunctions', 'cjbreakdown', 'cjsummary'], true);
-    if ($csvCanonical) {
-        $csvKind = substr($csvKind, 2);
+    // cj... and tl... are the Click a Canonical Junction and Click a TRS-L Dependent Junction downloads.
+    $csvTable = nj_read_table_kind('nj');
+    foreach (['cj', 'tl'] as $csvPrefix) {
+        if (in_array($csvKind, [$csvPrefix . 'junctions', $csvPrefix . 'breakdown', $csvPrefix . 'summary'], true)) {
+            $csvTable = nj_read_table_kind($csvPrefix);
+            $csvKind = substr($csvKind, 2);
+        }
     }
-    $csvCatalog = $csvCanonical ? $cjCatalog : $njCatalog;
-    $csvSummary = $csvCanonical ? $cjSummary : $njSummary;
-    $csvCheckName = $csvCanonical ? 'CjJunction' : 'NjJunction';
+    $csvCanonical = $csvTable['kind'] === 'cj';
+    $csvCatalog = $csvTable['kind'] === 'cj' ? $cjCatalog : ($csvTable['kind'] === 'tl' ? $tlCatalog : $njCatalog);
+    $csvSummary = $csvTable['kind'] === 'cj' ? $cjSummary : ($csvTable['kind'] === 'tl' ? $tlSummary : $njSummary);
+    $csvCheckName = $csvTable['check'];
     if ($csvKind === 'junctions' && $csvReady) {
         $catalogPicks = [];
         foreach ($csvCatalog as $catalogRow) {
@@ -410,12 +420,12 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                 );
             }
             header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename="' . ($csvCanonical ? 'canonical-' : '') . nj_read_junction_download_name(0, $csvCodes, true) . '"');
+            header('Content-Disposition: attachment; filename="' . $csvTable['file'] . nj_read_junction_download_name(0, $csvCodes, true) . '"');
             echo nj_read_zip_bytes($files);
             exit;
         }
     }
-    $breakdownPick = $csvCanonical ? nj_read_request_pick('CjPick') : $njPick;
+    $breakdownPick = $csvTable['kind'] === 'nj' ? $njPick : nj_read_request_pick($csvTable['pick']);
     $checkedForCsv = nj_read_request_junction_picks($csvCheckName);
     if (count($checkedForCsv) === 1) {
         $breakdownPick = $checkedForCsv[0];
@@ -438,28 +448,30 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     }
     header('Content-Type: text/csv; charset=UTF-8');
     $csvName = $csvKind === 'summary'
-        ? ($csvCanonical ? 'canonical-' : '') . nj_read_summary_download_name($csvCodes)
+        ? $csvTable['file'] . nj_read_summary_download_name($csvCodes)
         : 'junction-' . preg_replace('/[^a-z]+/', '', $csvKind) . '.csv';
     header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
         $sizeHead = $csvCanonical ? ['Start', 'Size'] : ['NJ Size', 'start'];
-        echo nj_read_csv_line([$sizeHead[0], $sizeHead[1], 'end', 'Delta V3', 'Omi V3', 'Delta V4.1', 'Omi V4.1', 'Overall Average']) . "\n";
+        $csvHead = [$sizeHead[0], $sizeHead[1], 'end'];
+        foreach ($njSelectedCols as $csvCol) {
+            $colHead = nj_read_column_heads($csvCol, $njBy);
+            $csvHead[] = trim($colHead[0] . ' ' . $colHead[1]);
+        }
+        $csvHead[] = 'Overall Average';
+        echo nj_read_csv_line($csvHead) . "\n";
         foreach ($csvSummary as $csvRow) {
             $second = $csvRow['nj_start'] === null ? '' : $csvRow['nj_start'];
             if ($csvCanonical) {
                 $second = ($csvRow['nj_start'] === null || $csvRow['nj_end'] === null) ? '' : $csvRow['nj_end'] - $csvRow['nj_start'] + 1;
             }
-            echo nj_read_csv_line([
-                $csvRow['nj_size'],
-                $second,
-                $csvRow['nj_end'] === null ? '' : $csvRow['nj_end'],
-                $csvRow['delta_v3'],
-                $csvRow['omi_v3'],
-                $csvRow['delta_v41'],
-                $csvRow['omi_v41'],
-                $csvRow['overall'],
-            ]) . "\n";
+            $csvLine = [$csvRow['nj_size'], $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
+            foreach ($njSelectedCols as $csvCol) {
+                $csvLine[] = isset($csvRow['cols'][$csvCol]) ? $csvRow['cols'][$csvCol] : '-1';
+            }
+            $csvLine[] = $csvRow['overall'];
+            echo nj_read_csv_line($csvLine) . "\n";
         }
     } else {
         echo nj_read_csv_line(['notice']) . "\n";
@@ -809,6 +821,12 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                 <input type="hidden" name="CjPick" value="<?php $cjPickNow = nj_read_request_pick('CjPick'); echo $cjPickNow === null ? '' : htmlspecialchars(nj_read_pick_value($cjPickNow['nj_size'], $cjPickNow['coord_tag']), ENT_QUOTES, 'UTF-8'); ?>" />
                 <?php $njTableKind = 'cj'; include __DIR__ . '/MutationsNj.php'; $njTableKind = 'nj'; ?>
             </div>
+            <div class="jq-filter-block">
+                <strong>Click a TRS-L Dependent Junction</strong>
+                <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('tlsummary'), ENT_QUOTES, 'UTF-8'); ?>">Download the summary table (trsl-<?php echo htmlspecialchars(nj_read_summary_download_name(jq_group_codes($njGroupRows)), ENT_QUOTES, 'UTF-8'); ?>)</a></p>
+                <input type="hidden" name="TlPick" value="<?php $tlPickNow = nj_read_request_pick('TlPick'); echo $tlPickNow === null ? '' : htmlspecialchars(nj_read_pick_value($tlPickNow['nj_size'], $tlPickNow['coord_tag']), ENT_QUOTES, 'UTF-8'); ?>" />
+                <?php $njTableKind = 'tl'; include __DIR__ . '/MutationsNj.php'; $njTableKind = 'nj'; ?>
+            </div>
             <div class="jq-filter-block" data-jq-all="primer">
                 <strong>Primer</strong>
                 <p class="text-muted" style="font-size:12px; margin:0 0 6px 0;">
@@ -1052,16 +1070,12 @@ if (window.JunctionQueryCharts) {
             btn.click();
         }
     });
-    $('#NjJunction, #CjJunction').on('change', 'input[type="checkbox"]', function () {
+    $('#NjJunction, #CjJunction, #TlJunction').on('change', 'input[type="checkbox"]', function () {
         submitFilterForm();
     });
-    $('.nj-select-all[data-nj-target="NjJunction"], .nj-select-all[data-nj-target="CjJunction"]').on('change', function () {
-        var target = $(this).attr('data-nj-target');
-        var breakdown = document.getElementById(target === 'CjJunction' ? 'cjBreakdown' : 'njBreakdown');
-        var checked = $('#' + target + ' input[type="checkbox"]:checked').length;
-        if (breakdown && checked !== 1) {
-            breakdown.style.display = 'none';
-        }
+    $('.nj-select-all[data-nj-target="NjJunction"], .nj-select-all[data-nj-target="CjJunction"], .nj-select-all[data-nj-target="TlJunction"]').on('change', function () {
+        // After the generic select-all handler below has ticked the boxes.
+        setTimeout(submitFilterForm, 0);
     });
     var form = document.querySelector('form.jq-form');
     if (form) {
@@ -1077,7 +1091,7 @@ if (window.JunctionQueryCharts) {
         savedScroll = sessionStorage.getItem('jqScrollY');
         sessionStorage.removeItem('jqScrollY');
     } catch (err) {}
-    var breakdown = (savedScroll === 'njBreakdown' || savedScroll === 'cjBreakdown') ? document.getElementById(savedScroll) : null;
+    var breakdown = /^(nj|cj|tl)Breakdown$/.test(savedScroll || '') ? document.getElementById(savedScroll) : null;
     if (breakdown) {
         breakdown.scrollIntoView({block: 'start'});
     } else if (savedScroll !== null && savedScroll !== '') {
