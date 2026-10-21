@@ -122,8 +122,7 @@ if ($njCanonical) {
 }
 echo '<div class="nj-datagrid" id="' . $njCheckName . '"><table class="sortable"><thead><tr class="dark">';
 if ($njKind['kind'] === 'tl') {
-    // Jim's TRS-L files are named by this number; start and end come when he sends the junction list.
-    echo '<th></th><th>Junction</th><th>Start</th><th>End</th>';
+    echo '<th></th><th>Size</th><th>Start</th><th>End</th>';
 } else {
     echo $njCanonical ? '<th></th><th>Start</th><th>Size</th><th>End</th>' : '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
 }
@@ -151,7 +150,7 @@ foreach ($catalog as $row) {
     echo '<tr class="nj-pick-row' . ($current ? ' nj-pick-current' : '') . '" style="' . $rowStyle . '">';
     echo '<td><input type="checkbox" name="' . $njCheckName . '[]" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '"' . $junctionChecked . ' /></td>';
     echo '<td><button type="submit" class="nj-show" name="' . $njPickName . '" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '" data-nj-breakdown="' . $njBreakdownId . '">';
-    echo (int) $row['nj_size'] . ($njKind['kind'] === 'tl' && strlen((string) $row['coord_tag']) > 1 ? '_' . htmlspecialchars(substr((string) $row['coord_tag'], 1), ENT_QUOTES, 'UTF-8') : '');
+    echo (int) $row['nj_size'];
     echo '</button></td>';
     if ($njCanonical) {
         // Canonical rows are keyed by start (nj_size holds it); the size is end - start + 1, as in Jim's del_coord_cjs.csv.
@@ -212,9 +211,6 @@ foreach (array_slice($breakdownRows, 0, $njBreakdownMax) as $pickRow) {
     $start = $pickRow['nj_start'] === null ? '' : (string) $pickRow['nj_start'];
     $end = $pickRow['nj_end'] === null ? '' : (string) $pickRow['nj_end'];
     echo '<h4 class="search-header" style="margin-top:14px;">' . htmlspecialchars($njKind['heading'], ENT_QUOTES, 'UTF-8') . (int) $pickRow['nj_size'];
-    if ($njKind['kind'] === 'tl' && strlen((string) $pickRow['coord_tag']) > 1) {
-        echo '_' . htmlspecialchars(substr((string) $pickRow['coord_tag'], 1), ENT_QUOTES, 'UTF-8');
-    }
     if ($start !== '' || $end !== '') {
         echo ' (' . htmlspecialchars($start, ENT_QUOTES, 'UTF-8') . '–' . htmlspecialchars($end, ENT_QUOTES, 'UTF-8') . ')';
     }

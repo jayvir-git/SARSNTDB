@@ -758,7 +758,7 @@ if (!function_exists('nj_read_table_kind')) {
     /**
      * Form names and labels for the three junction tables on Junction groups.
      * cj rows are keyed by start (D-80); nj rows by size, with the start added for a repeated size;
-     * tl rows by the number in Jim's file names, coord_tag L plus any second number (D-81).
+     * tl rows by size, coord_tag L plus the start for a repeated size (D-81).
      *
      * @return array<string,string>
      */

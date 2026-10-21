@@ -458,7 +458,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
-        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ($csvTable['kind'] === 'tl' ? ['Junction', 'start'] : ['NJ Size', 'start']);
+        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ($csvTable['kind'] === 'tl' ? ['Size', 'start'] : ['NJ Size', 'start']);
         $csvHead = [$sizeHead[0], $sizeHead[1], 'end'];
         foreach ($njSelectedCols as $csvCol) {
             $colHead = nj_read_column_heads($csvCol, $njBy);
@@ -471,11 +471,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
             if ($csvCanonical) {
                 $second = ($csvRow['nj_start'] === null || $csvRow['nj_end'] === null) ? '' : $csvRow['nj_end'] - $csvRow['nj_start'] + 1;
             }
-            $first = (string) $csvRow['nj_size'];
-            if ($csvTable['kind'] === 'tl' && strlen($csvRow['coord_tag']) > 1) {
-                $first .= '_' . substr($csvRow['coord_tag'], 1);
-            }
-            $csvLine = [$first, $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
+            $csvLine = [$csvRow['nj_size'], $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
             foreach ($njSelectedCols as $csvCol) {
                 $csvLine[] = isset($csvRow['cols'][$csvCol]) ? $csvRow['cols'][$csvCol] : '-1';
             }

@@ -543,8 +543,9 @@ def add_catalog_reads(roots: list[Path]) -> None:
         print(f"added {code} {n}")
 
 
-# TRS-L dependent junctions (Jim, Zoom 2026-10-21, D-81): Jim's NJ_data_TRS_L folder, {base}{number}[_{tag}]_coord.csv.
-# Stored with coord_tag "L" + tag so they never share a key with Click a Junction rows (2723 is in both).
+# TRS-L dependent junctions (Jim, Zoom 2026-10-21, D-81): Jim's NJ_data_TRS_L folder, {base}{size}[_{start}]_coord.csv.
+# Stored with coord_tag "L" + start so they never share a key with Click a Junction rows (2723 is in both).
+# Start and end come from Jim's size,start,end lists (gitignored packet files, passed with --trsl-coords).
 TRSL_TAG = "L"
 
 
@@ -565,9 +566,27 @@ def parse_trsl_name(filename: str) -> tuple[str, int, str] | None:
     return None
 
 
-def load_trsl(root: Path) -> None:
+def trsl_coords(paths: list[Path]) -> dict[tuple[int, str], tuple[int, int]]:
+    """(size, coord tag) -> (start, end) from Jim's size,start,end CSVs; a size listed twice is keyed by its start."""
+    rows: list[tuple[int, int, int]] = []
+    for path in paths:
+        with path.open(newline="", encoding="utf-8-sig") as fh:
+            for row in csv.reader(fh):
+                if len(row) >= 3 and all(cell.strip().isdigit() for cell in row[:3]):
+                    rows.append((int(row[0]), int(row[1]), int(row[2])))
+    counts: dict[int, int] = {}
+    for size, _start, _end in rows:
+        counts[size] = counts.get(size, 0) + 1
+    out: dict[tuple[int, str], tuple[int, int]] = {}
+    for size, start, end in rows:
+        out[(size, TRSL_TAG + (str(start) if counts[size] > 1 else ""))] = (start, end)
+    return out
+
+
+def load_trsl(root: Path, coord_files: list[Path] | None = None) -> None:
     """Add TRS-L catalog rows (kind tl) and their reads; groups without files stay without rows (shown as -1)."""
     cfg = parse_connection_php()
+    coords = trsl_coords(coord_files or [])
     groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
     samples: dict[int, set[str]] = {}
     for gid, sample in mysql_pairs("SELECT DISTINCT group_id, sample_name FROM vcf_snv_nj_read", cfg):
@@ -607,13 +626,15 @@ def load_trsl(root: Path) -> None:
             insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
             pending = []
     insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
-    insert_values(
-        "vcf_snv_nj_catalog",
-        "nj_size,nj_start,nj_end,coord_tag,kind",
-        ["(" + str(number) + ",NULL,NULL," + sql_str(tag) + ",'tl')" for number, tag in sorted(keys)],
-        cfg,
-    )
-    print("catalog tl", len(keys))
+    catalog_rows = []
+    for number, tag in sorted(keys):
+        start, end = coords.get((number, tag), (None, None))
+        catalog_rows.append(
+            "(" + str(number) + "," + ("NULL" if start is None else str(start)) + ","
+            + ("NULL" if end is None else str(end)) + "," + sql_str(tag) + ",'tl')"
+        )
+    insert_values("vcf_snv_nj_catalog", "nj_size,nj_start,nj_end,coord_tag,kind", catalog_rows, cfg)
+    print("catalog tl", len(keys), "with start and end", sum(1 for key in keys if key in coords))
     for code, n in sorted(added.items()):
         print(f"trsl {code} {n}")
 
@@ -632,9 +653,10 @@ def main() -> None:
         help="Load reads for catalog rows a group lacks, from --nj-root (default: every packet)",
     )
     parser.add_argument("--trsl-root", type=Path, default=None, help="Load TRS-L dependent junctions from this folder")
+    parser.add_argument("--trsl-coords", type=Path, action="append", default=None, help="Jim's size,start,end CSV (repeatable)")
     args = parser.parse_args()
     if args.trsl_root is not None:
-        load_trsl(args.trsl_root)
+        load_trsl(args.trsl_root, args.trsl_coords)
         return
     if args.add_catalog_reads:
         add_catalog_reads(args.nj_root or [INCOMING])

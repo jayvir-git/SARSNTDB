@@ -70,6 +70,14 @@ expect(njimp.parse_trsl_name("NJ_all_﻿61_coord.csv") == ("NJ_all_", 61, "L"), 
 expect(njimp.parse_trsl_name("Argentina-uniq-all_0_0_coord.csv") == ("Argentina-uniq-all_", 0, "L0"), "TRS-L second number in the tag")
 expect(njimp.parse_trsl_name("LA_500_miseq_635_coord.csv") == ("LA_500_miseq_", 635, "L"), "TRS-L LA base")
 expect(njimp.parse_trsl_name("NJ_all_635_coord1.csv") is None, "TRS-L coord1 skipped")
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    coord_csv = Path(tmp) / "trsl.csv"
+    # Made-up numbers: junction coordinates stay out of this public repo.
+    coord_csv.write_text("\ufeff40,11,50\n300,21,320\n300,22,321\n", encoding="utf-8")
+    coords = njimp.trsl_coords([coord_csv])
+expect(coords[(40, "L")] == (11, 50), "TRS-L size read with BOM")
+expect(coords[(300, "L21")] == (21, 320) and coords[(300, "L22")] == (22, 321), "TRS-L repeated size keyed by start")
 
 if failed:
     print(failed, "failed")
