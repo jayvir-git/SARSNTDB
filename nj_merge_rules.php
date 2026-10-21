@@ -858,6 +858,24 @@ if (!function_exists('nj_read_filter_table')) {
         foreach ($groups as $group) {
             $groupId = (int) $group['id'];
             $denoms = isset($denomsByGroup[$groupId]) ? $denomsByGroup[$groupId] : [];
+            if ($mode === 'pair') {
+                // A group whose pair columns show nothing at a minimum of 20 is left off this table
+                // (Jim 2026-10-21: Philippines was all zeros; its only count is Alpha, which has no pair column).
+                $probe = $opt;
+                $probe['min_samples'] = 20;
+                $probe['show_below'] = false;
+                $shows = false;
+                foreach ($cols as $col) {
+                    $value = nj_read_grouped_count($denoms, $col['buckets'], $col['primers'], $probe, isset($col['block']) ? $col['block'] : null);
+                    if (is_numeric($value) && (float) $value > 0) {
+                        $shows = true;
+                        break;
+                    }
+                }
+                if (!$shows) {
+                    continue;
+                }
+            }
             $line = [(string) $group['label']];
             if ($mode === 'variant') {
                 $line[] = nj_read_group_type(nj_read_variant_totals($denoms), $opt['min_samples']);
