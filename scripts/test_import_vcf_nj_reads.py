@@ -69,10 +69,10 @@ expect(parse_coord_name("NJ_all_40_1001_coord.csv") == ("NJ-PRJNA708324", 40, "1
 expect(parse_coord_name("UT_6000_5001_coord.csv") == ("UT_6000", 5001, ""), "Utah canonical file loads")
 njimp.ALLOWED = set()
 # 21 Oct Zoom: TRS-L dependent junctions get an L tag; some of Jim's names carry a BOM (D-81).
-expect(njimp.parse_trsl_name("NJ_all_﻿61_coord.csv") == ("NJ_all_", 61, "L"), "TRS-L name with BOM")
-expect(njimp.parse_trsl_name("Argentina-uniq-all_0_0_coord.csv") == ("Argentina-uniq-all_", 0, "L0"), "TRS-L second number in the tag")
-expect(njimp.parse_trsl_name("LA_500_miseq_635_coord.csv") == ("LA_500_miseq_", 635, "L"), "TRS-L LA base")
-expect(njimp.parse_trsl_name("NJ_all_635_coord1.csv") is None, "TRS-L coord1 skipped")
+expect(njimp.parse_trsl_name("NJ_all_﻿1708_coord.csv") == ("NJ_all_", 1708, "L"), "TRS-L name with BOM")
+expect(njimp.parse_trsl_name("Argentina-uniq-all_1706_11_coord.csv") == ("Argentina-uniq-all_", 1706, "L11"), "TRS-L second number in the tag")
+expect(njimp.parse_trsl_name("LA_500_miseq_1707_coord.csv") == ("LA_500_miseq_", 1707, "L"), "TRS-L LA base")
+expect(njimp.parse_trsl_name("NJ_all_1707_coord1.csv") is None, "TRS-L coord1 skipped")
 import tempfile
 with tempfile.TemporaryDirectory() as tmp:
     coord_csv = Path(tmp) / "trsl.csv"

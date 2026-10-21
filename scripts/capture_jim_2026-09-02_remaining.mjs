@@ -99,7 +99,7 @@ for (const dir of [PACKET, PICTURES]) {
 }
 
 try {
-  const probe = await fetch(`${BASE}/TwoSegmentStructures.php?left=0&right=0&layout=compact`);
+  const probe = await fetch(`${BASE}/TwoSegmentStructures.php?layout=compact`);
   if (!probe.ok) {
     throw new Error('HTTP ' + probe.status);
   }

@@ -14,16 +14,12 @@ Jim convention: `coord_from=1`, `coord_left=start`, `coord_right=end`, `coord_to
 
 **Do first (call):**
 1. 5249–23191, size 17943 — may already exist (`sql/junction_query_two_segment.sql`). Ensure it is in `two_segment_structure`.
-2. 0–0, size 0 — **new**.
+2. A second junction from the call (coordinates in `_incoming/jim-kelley/NJ-table-small.csv`) — **new**.
 
 **Then (email `primer_controls1.xlsx`, columns Size / NJ Start / NJ End):**
-- 0–0 (0)
-- 0–0 (0)
-- 0–0 (0)
-- 0–0 (0)
-- 0–0 (0)
+- Five more junctions; the list is in that workbook and `_incoming/jim-kelley/NJ-table-small.csv` (not in this public repo: junction coordinates are unpublished).
 
-Call said: get 17943 + 894 looking right **before** dumping every extra junction on him. Safe approach: insert all in SQL, but UI screenshot / default deep-link is **17943**.
+Call said: get 17943 and the second junction looking right **before** dumping every extra junction on him. Safe approach: insert all in SQL, but UI screenshot / default deep-link is **17943**.
 
 ## Primer BED files
 
@@ -81,7 +77,7 @@ Do not break Genome search CJ/NJ links or Junction groups (`JunctionGroupQuery.p
 3. V3: arrows near 5249 and/or 23191.
 4. V5 / Midnight: few or none in the 500 bp window (Jim’s claim).
 5. LEFT arrows point right; RIGHT arrows point left.
-6. Repeat for 0 (0–0).
+6. Repeat for the second junction.
 
 ## Context sources (read-only)
 
@@ -92,4 +88,4 @@ Do not break Genome search CJ/NJ links or Junction groups (`JunctionGroupQuery.p
 
 - Re-import Viridian NJ/NM counts unless asked.
 - Put primers on the Junction groups **percent** charts.
-- Wait for more junctions before shipping 17943 + 894.
+- Wait for more junctions before shipping 17943 and the second junction.

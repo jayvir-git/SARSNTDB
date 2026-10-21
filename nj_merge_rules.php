@@ -1093,7 +1093,7 @@ if (!function_exists('nj_read_download_group_token')) {
 
 if (!function_exists('nj_read_junction_download_name')) {
     /**
-     * A second junction of the same size keeps its start in the name (0_0).
+     * A second junction of the same size keeps its start in the name (SIZE_START).
      * Names must never collide (D-57).
      *
      * @param list<string> $codes
@@ -1105,7 +1105,7 @@ if (!function_exists('nj_read_junction_download_name')) {
             return 'junctions_' . $groups . '.zip';
         }
         $name = (string) (int) $size;
-        // TRS-L tags (L, L0) name the file without the L: 61_..., 0_0_...
+        // TRS-L tags (L, L71) name the file without the L: SIZE_..., SIZE_START_...
         $tag = ltrim((string) $coordTag, 'L');
         if ($tag !== '') {
             $name .= '_' . $tag;

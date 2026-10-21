@@ -10,7 +10,7 @@ _incoming/*
 !_incoming/README.md
 !_incoming/jim-kelley/
 _incoming/jim-kelley/*
-!_incoming/jim-kelley/README.md
+# _incoming/jim-kelley/README.md stays local: it names NJ files by coordinate (unpublished).
 
 # Local tools, meetings, one-off scratch
 .codex-tools/
