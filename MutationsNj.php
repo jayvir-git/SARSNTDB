@@ -118,7 +118,7 @@ echo '<button type="submit" class="btn btn-default btn-sm" name="csv" value="' .
 if ($njCanonical) {
     echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the start and short group names, as in <code>START_Arg_Port550_NJ.csv</code>. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
 } else {
-    echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names. Three groups at size 894 download as <code>894_Arg_Port550_NJ.csv</code>. When another junction has the same size, its start is added, as in <code>0_0_NJ.csv</code>. Sizes under 100 are the small deletions. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
+    echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names. Three groups download as <code>SIZE_Arg_Port550_NJ.csv</code>. When another junction has the same size, its start is added, as in <code>SIZE_START_NJ.csv</code>. Sizes under 100 are the small deletions. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
 }
 echo '<div class="nj-datagrid" id="' . $njCheckName . '"><table class="sortable"><thead><tr class="dark">';
 if ($njKind['kind'] === 'tl') {

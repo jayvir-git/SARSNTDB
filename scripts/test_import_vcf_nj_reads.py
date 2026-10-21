@@ -26,7 +26,7 @@ expect(
     "strip sample-list suffix",
 )
 expect(
-    parse_coord_name("SAfr_miseq_0325_17943_coord.csv") == ("S_Afr-PRJNA636748", 17943, ""),
+    parse_coord_name("SAfr_miseq_0325_1701_coord.csv") == ("S_Afr-PRJNA636748", 1701, ""),
     "simple coord name",
 )
 expect(
@@ -35,23 +35,23 @@ expect(
 )
 expect(parse_coord_name("India-6000_all_28190_coord.csv") == ("India-6000", 28190, ""), "sheet hyphen also maps")
 expect(parse_coord_name("Ang_miseq_40_1001_coord.csv") is None, "extra start coordinate skipped")
-expect(parse_coord_name("Ang_miseq_894_coord1.csv") is None, "coord1 skipped")
-expect(parse_coord_name("PRJNA656534-NM_894_coord.csv") == ("NM", 894, ""), "New Mexico simple file")
-expect(parse_coord_name("PRJNA625551-VA_894_coord.csv") == ("VA", 894, ""), "Virginia simple file")
-expect(parse_coord_name("Austr_nextseq500_894_coord.csv") == ("Austr-PRJNA613958_nextseq500", 894, ""), "Australia 500 simple file")
-expect(parse_coord_name("Austr_nextseq550_894_coord.csv") == ("Austr-PRJNA613958_nextseq550", 894, ""), "Australia 550 simple file")
-expect(parse_coord_name("LA_all_102_coord.csv") == ("LA-PRJNA815364", 102, ""), "LA simple file")
-expect(parse_coord_name("Broad_all_uniq_1012_894_coord.csv") == ("PRJNA622837-Broad_Inst", 894, ""), "12 Oct Broad base")
-expect(parse_coord_name("Denmark_nextseq_550_894_coord.csv") == ("Denmark-nextseq550", 894, ""), "Denmark 550 base")
-expect(parse_coord_name("PRJEB72496-Denm-6000_894_coord.csv") == ("PRJEB72496-Denmark-6000", 894, ""), "Denmark 6000 base")
-expect(parse_coord_name("PRJNA746690-CA_894_coord.csv") == ("PRJNA746690-CA", 894, ""), "California base")
-expect(parse_coord_name("PRJNA744530-RI_894_coord.csv") == ("PRJNA744530-RI", 894, ""), "Rhode Island base")
-expect(parse_coord_name("Broad_6000_894_coord.csv") == ("PRJNA622837-Broad_Inst", 894, ""), "old Broad base still maps")
+expect(parse_coord_name("Ang_miseq_1702_coord1.csv") is None, "coord1 skipped")
+expect(parse_coord_name("PRJNA656534-NM_1702_coord.csv") == ("NM", 1702, ""), "New Mexico simple file")
+expect(parse_coord_name("PRJNA625551-VA_1702_coord.csv") == ("VA", 1702, ""), "Virginia simple file")
+expect(parse_coord_name("Austr_nextseq500_1702_coord.csv") == ("Austr-PRJNA613958_nextseq500", 1702, ""), "Australia 500 simple file")
+expect(parse_coord_name("Austr_nextseq550_1702_coord.csv") == ("Austr-PRJNA613958_nextseq550", 1702, ""), "Australia 550 simple file")
+expect(parse_coord_name("LA_all_1703_coord.csv") == ("LA-PRJNA815364", 1703, ""), "LA simple file")
+expect(parse_coord_name("Broad_all_uniq_1012_1702_coord.csv") == ("PRJNA622837-Broad_Inst", 1702, ""), "12 Oct Broad base")
+expect(parse_coord_name("Denmark_nextseq_550_1702_coord.csv") == ("Denmark-nextseq550", 1702, ""), "Denmark 550 base")
+expect(parse_coord_name("PRJEB72496-Denm-6000_1702_coord.csv") == ("PRJEB72496-Denmark-6000", 1702, ""), "Denmark 6000 base")
+expect(parse_coord_name("PRJNA746690-CA_1702_coord.csv") == ("PRJNA746690-CA", 1702, ""), "California base")
+expect(parse_coord_name("PRJNA744530-RI_1702_coord.csv") == ("PRJNA744530-RI", 1702, ""), "Rhode Island base")
+expect(parse_coord_name("Broad_6000_1702_coord.csv") == ("PRJNA622837-Broad_Inst", 1702, ""), "old Broad base still maps")
 import import_vcf_nj_reads as njimp
-njimp.ALLOWED = {(0, ""), (0, "0"), (0, "0"), (0, "0")}
-expect(parse_coord_name("LA_all_2766_coord.csv") == ("LA-PRJNA815364", 2766, ""), "simple 2766 file")
-expect(parse_coord_name("LA_all_0_0_coord.csv") == ("LA-PRJNA815364", 0, "0"), "row 69 uses 0_0")
-expect(parse_coord_name("LA_all_0_0_coord.csv") == ("LA-PRJNA815364", 0, "0"), "duplicate 0 uses its start")
+njimp.ALLOWED = {(1704, ""), (1704, "1101"), (1705, "2101"), (1705, "2102")}
+expect(parse_coord_name("LA_all_1704_coord.csv") == ("LA-PRJNA815364", 1704, ""), "simple 1704 file")
+expect(parse_coord_name("LA_all_1704_1101_coord.csv") == ("LA-PRJNA815364", 1704, "1101"), "row 69 uses 1704_1101")
+expect(parse_coord_name("LA_all_1705_2101_coord.csv") == ("LA-PRJNA815364", 1705, "2101"), "duplicate 1705 uses its start")
 expect(parse_coord_name("LA_all_40_1001_coord.csv") is None, "untagged extra number stays out")
 # 21 Oct: small deletions and canonical junctions come from Jim's lists in the packet (D-80).
 # Made-up numbers here: junction coordinates stay out of this public repo.

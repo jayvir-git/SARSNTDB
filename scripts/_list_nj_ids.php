@@ -4,37 +4,20 @@ if (!isset($con) || $con->connect_errno) {
     fwrite(STDERR, "mysql-fail\n");
     exit(1);
 }
-$want = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-];
+// NJ coordinates are unpublished, so the list lives in the gitignored _incoming/nj_screenshot_list.csv (left,right,size).
+$listFile = dirname(__DIR__) . '/_incoming/nj_screenshot_list.csv';
+if (!is_file($listFile)) {
+    fwrite(STDERR, "missing $listFile
+");
+    exit(1);
+}
+$want = [];
+foreach (file($listFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+    $cells = array_map('trim', explode(',', $line));
+    if (count($cells) >= 3 && ctype_digit($cells[0]) && ctype_digit($cells[1]) && ctype_digit($cells[2])) {
+        $want[] = [(int) $cells[0], (int) $cells[1], (int) $cells[2]];
+    }
+}
 $out = [];
 $stmt = $con->prepare('SELECT id FROM two_segment_structure WHERE coord_left = ? AND coord_right = ? LIMIT 1');
 foreach ($want as $row) {

@@ -148,19 +148,19 @@ $splitDenoms = [
 expect(nj_read_grouped_count($splitDenoms, ['ba'], ['COVID-ARTIC-V3'], ['min_samples' => 30], 'ba2') === '40', 'BA.2 column leaves out BA.5');
 expect(nj_read_grouped_count($splitDenoms, ['ba'], ['COVID-ARTIC-V3'], ['min_samples' => 30], 'ba5') === '-1', 'BA.5 under the minimum is -1');
 expect(nj_read_grouped_count($splitDenoms, ['ba'], ['COVID-ARTIC-V3'], ['min_samples' => 30, 'merge_ba' => true], 'ba') === '40', 'merged BA.2-5 keeps the large subtype');
-expect(nj_read_junction_download_name(894, ['PRJEB46220-Argentina', 'Port-PRJEB47340', 'NJ-PRJNA708324'], false) === '894_Arg_Port550_NJ.csv', 'junction file uses size and short group names');
-expect(nj_read_junction_download_name(2766, ['NJ-PRJNA708324'], false, '') === '2766_NJ.csv', 'common junction keeps the size-only name');
-expect(nj_read_junction_download_name(0, ['NJ-PRJNA708324'], false, '0') === '0_0_NJ.csv', 'less common junction adds its start');
-expect(nj_read_junction_download_name(0, ['NJ-PRJNA708324'], false, '0') === '0_0_NJ.csv', 'tagged copy of a shared size includes the start');
+expect(nj_read_junction_download_name(1702, ['PRJEB46220-Argentina', 'Port-PRJEB47340', 'NJ-PRJNA708324'], false) === '1702_Arg_Port550_NJ.csv', 'junction file uses size and short group names');
+expect(nj_read_junction_download_name(1704, ['NJ-PRJNA708324'], false, '') === '1704_NJ.csv', 'common junction keeps the size-only name');
+expect(nj_read_junction_download_name(1704, ['NJ-PRJNA708324'], false, '1101') === '1704_1101_NJ.csv', 'less common junction adds its start');
+expect(nj_read_junction_download_name(1705, ['NJ-PRJNA708324'], false, '2101') === '1705_2101_NJ.csv', 'tagged copy of a shared size includes the start');
 expect(nj_read_junction_download_name(0, ['NJ-PRJNA708324'], true) === 'junctions_NJ.zip', 'checked junctions download as a zip');
 expect(nj_read_summary_download_name(['NJ-PRJNA708324']) === 'junction-summary_NJ.csv', 'summary file names the group');
 expect(nj_read_summary_download_name(['PRJEB46220-Argentina', 'Port-PRJEB47340', 'NJ-PRJNA708324']) === 'junction-summary_Arg_Port550_NJ.csv', 'summary file names every selected group');
 $zipBytes = nj_read_zip_bytes([
-    '894_Arg_NJ.csv' => "Group,Alpha\nNJ,1\n",
-    '102_Arg_NJ.csv' => "Group,Alpha\nNJ,2\n",
+    '1702_Arg_NJ.csv' => "Group,Alpha\nNJ,1\n",
+    '1703_Arg_NJ.csv' => "Group,Alpha\nNJ,2\n",
 ]);
 expect(substr($zipBytes, 0, 4) === "PK\x03\x04", 'zip starts with a local file header');
-expect(strpos($zipBytes, '894_Arg_NJ.csv') !== false && strpos($zipBytes, '102_Arg_NJ.csv') !== false, 'zip names each junction file');
+expect(strpos($zipBytes, '1702_Arg_NJ.csv') !== false && strpos($zipBytes, '1703_Arg_NJ.csv') !== false, 'zip names each junction file');
 expect(substr($zipBytes, -22, 4) === "PK\x05\x06", 'zip ends with the directory record');
 
 $_GET = [];
@@ -250,10 +250,10 @@ $colCells = nj_read_group_column_cells($colDenoms, $colHits, $colKeys, 'pair', [
 expect($colCells['Delta (B.1.617.2-like)|COVID-ARTIC-V3'] === ['n' => 10, 'd' => 40], 'pair cell counts hits over samples');
 expect(!isset($colCells['Delta (B.1.617.2-like)|COVID-ARTIC-V4.1']), 'pair under the minimum is left out');
 $colRows = nj_read_summary_column_rows(
-    [['nj_size' => 894, 'coord_tag' => '', 'nj_start' => 1, 'nj_end' => 894]],
+    [['nj_size' => 1702, 'coord_tag' => '', 'nj_start' => 1, 'nj_end' => 1702]],
     [7, 8],
     [7 => $colDenoms, 8 => ['Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 40]]],
-    ['pairs' => ['894|' => [7 => $colHits, 8 => ['Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 10]]]], 'overall' => ['894|' => [7 => 35, 8 => 10]]],
+    ['pairs' => ['1702|' => [7 => $colHits, 8 => ['Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 10]]]], 'overall' => ['1702|' => [7 => 35, 8 => 10]]],
     $colKeys,
     'pair',
     ['min_samples' => 30]
