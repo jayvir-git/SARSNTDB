@@ -23,9 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_nj.sql"
 # Samples with no junction reads in any _coord file are not analyzed (Jim, 2026-10-19).
 NO_NJ_READS_SQL = ROOT / "sql" / "vcf_snv_no_nj_reads.sql"
-# Small deletions and canonical junctions (Jim, 2026-10-21) are added to the catalog by this file.
-SMALL_CANONICAL_SQL = ROOT / "sql" / "vcf_snv_nj_catalog_small_canonical.sql"
 INCOMING = ROOT / "_incoming" / "jim-kelley"
+# Small deletions (size,start,end) and canonical junctions (start,size,end) from Jim's 2026-10-21 lists. They live in the
+# gitignored packet, never in this public repo (junction coordinates are unpublished); moving the packet breaks the load.
+SMALL_DEL_CSV = INCOMING / "2026-10-21_small-del-canonical" / "files" / "small_del.csv"
+CANONICAL_CSV = INCOMING / "2026-10-21_small-del-canonical" / "files" / "del_coord_cjs.csv"
 DRIVE = ROOT / "_incoming" / "jim-kelley" / "2026-09-22_nj-reads-many-projects" / "drive"
 # Reads the gitignored packet copy of the catalog; moving that packet breaks the import silently.
 CATALOG = ROOT / "_incoming" / "jim-kelley" / "2026-09-23_nj-on-junction-page" / "files" / "NJ-table_no_types.csv"
@@ -504,11 +506,43 @@ def load_only(
             print("eligibility updated", code)
 
 
+def small_canonical_rows(small_csv: Path = SMALL_DEL_CSV, canonical_csv: Path = CANONICAL_CSV) -> list[tuple[int, int, int, str, str]]:
+    """(nj_size, start, end, coord_tag, kind) for the catalog. Small-deletion files carry their start
+    ({base}{size}_{start}_coord.csv); canonical files are named by the start, which nj_size holds, as for 28190 (D-80)."""
+    rows: list[tuple[int, int, int, str, str]] = []
+    for path, kind in ((small_csv, "nj"), (canonical_csv, "cj")):
+        if not path.is_file():
+            raise SystemExit("missing " + str(path))
+        with path.open(newline="", encoding="utf-8-sig") as fh:
+            for row in csv.reader(fh):
+                if len(row) < 3 or not all(cell.strip().isdigit() for cell in row[:3]):
+                    continue
+                a, b, c = (int(cell) for cell in row[:3])
+                if kind == "nj":
+                    rows.append((a, b, c, str(b), "nj"))
+                else:
+                    rows.append((a, a, c, "", "cj"))
+    return rows
+
+
+def apply_small_canonical(cfg: dict) -> None:
+    values = [
+        "(" + str(size) + "," + str(start) + "," + str(end) + "," + sql_str(tag) + "," + sql_str(kind) + ")"
+        for size, start, end, tag, kind in small_canonical_rows()
+    ]
+    mysql_run(
+        "INSERT INTO vcf_snv_nj_catalog (nj_size, nj_start, nj_end, coord_tag, kind) VALUES "
+        + ",".join(values)
+        + " ON DUPLICATE KEY UPDATE nj_start = VALUES(nj_start), nj_end = VALUES(nj_end), kind = VALUES(kind)",
+        cfg,
+    )
+
+
 def add_catalog_reads(roots: list[Path]) -> None:
     """Load reads for catalog rows a group has none of yet. Existing reads and eligibility stay as they are."""
     global ALLOWED
     cfg = parse_connection_php()
-    mysql_run(SMALL_CANONICAL_SQL.read_text(encoding="utf-8"), cfg)
+    apply_small_canonical(cfg)
     catalog = {(int(size), tag) for size, tag in mysql_pairs("SELECT nj_size, coord_tag FROM vcf_snv_nj_catalog", cfg)}
     ALLOWED = set(catalog)
     groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
@@ -698,7 +732,7 @@ def main() -> None:
             + ")"
         )
     insert_values("vcf_snv_nj_catalog", "nj_size,nj_start,nj_end,coord_tag,kind", catalog_sql, cfg)
-    mysql_run(SMALL_CANONICAL_SQL.read_text(encoding="utf-8"), cfg)
+    apply_small_canonical(cfg)
     for size, tag in mysql_pairs("SELECT nj_size, coord_tag FROM vcf_snv_nj_catalog", cfg):
         ALLOWED.add((int(size), tag))
 

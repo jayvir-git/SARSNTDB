@@ -34,7 +34,7 @@ expect(
     "Drive India underscore base",
 )
 expect(parse_coord_name("India-6000_all_28190_coord.csv") == ("India-6000", 28190, ""), "sheet hyphen also maps")
-expect(parse_coord_name("Ang_miseq_0_0_coord.csv") is None, "extra start coordinate skipped")
+expect(parse_coord_name("Ang_miseq_40_1001_coord.csv") is None, "extra start coordinate skipped")
 expect(parse_coord_name("Ang_miseq_894_coord1.csv") is None, "coord1 skipped")
 expect(parse_coord_name("PRJNA656534-NM_894_coord.csv") == ("NM", 894, ""), "New Mexico simple file")
 expect(parse_coord_name("PRJNA625551-VA_894_coord.csv") == ("VA", 894, ""), "Virginia simple file")
@@ -52,18 +52,21 @@ njimp.ALLOWED = {(0, ""), (0, "0"), (0, "0"), (0, "0")}
 expect(parse_coord_name("LA_all_2766_coord.csv") == ("LA-PRJNA815364", 2766, ""), "simple 2766 file")
 expect(parse_coord_name("LA_all_0_0_coord.csv") == ("LA-PRJNA815364", 0, "0"), "row 69 uses 0_0")
 expect(parse_coord_name("LA_all_0_0_coord.csv") == ("LA-PRJNA815364", 0, "0"), "duplicate 0 uses its start")
-expect(parse_coord_name("LA_all_0_0_coord.csv") is None, "untagged extra number stays out")
-# 21 Oct: small deletions and canonical junctions come from the catalog SQL (D-80).
-import re
-sql = njimp.SMALL_CANONICAL_SQL.read_text(encoding="utf-8")
-rows = re.findall(r"\((\d+), (\d+), (\d+), '(\d*)', '(nj|cj)'\)", sql)
-expect(len([r for r in rows if r[4] == "nj"]) == 9, "nine small deletions")
-expect(len([r for r in rows if r[4] == "cj"]) == 8, "eight canonical junctions, 28190 included")
-expect(all(int(r[2]) - int(r[1]) + 1 == int(r[0]) for r in rows if r[4] == "nj"), "small deletion size is end - start + 1")
-expect(all(r[0] == r[1] and r[3] == "" for r in rows if r[4] == "cj"), "canonical rows are keyed by start")
-njimp.ALLOWED = {(int(r[0]), r[3]) for r in rows}
-expect(parse_coord_name("NJ_all_0_0_coord.csv") == ("NJ-PRJNA708324", 0, "0"), "small deletion file loads")
-expect(parse_coord_name("UT_6000_21486_coord.csv") == ("UT_6000", 21486, ""), "Utah canonical file loads")
+expect(parse_coord_name("LA_all_40_1001_coord.csv") is None, "untagged extra number stays out")
+# 21 Oct: small deletions and canonical junctions come from Jim's lists in the packet (D-80).
+# Made-up numbers here: junction coordinates stay out of this public repo.
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    small_csv = Path(tmp) / "small.csv"
+    canonical_csv = Path(tmp) / "canonical.csv"
+    small_csv.write_text("40,1001,1040\n41,2001,2041\n", encoding="utf-8")
+    canonical_csv.write_text("\ufeff5001,60,5060\n", encoding="utf-8")
+    rows = njimp.small_canonical_rows(small_csv, canonical_csv)
+expect(rows[0] == (40, 1001, 1040, "1001", "nj"), "small deletion keyed by size, tagged by start")
+expect(rows[2] == (5001, 5001, 5060, "", "cj"), "canonical junction keyed by start")
+njimp.ALLOWED = {(r[0], r[3]) for r in rows}
+expect(parse_coord_name("NJ_all_40_1001_coord.csv") == ("NJ-PRJNA708324", 40, "1001"), "small deletion file loads")
+expect(parse_coord_name("UT_6000_5001_coord.csv") == ("UT_6000", 5001, ""), "Utah canonical file loads")
 njimp.ALLOWED = set()
 # 21 Oct Zoom: TRS-L dependent junctions get an L tag; some of Jim's names carry a BOM (D-81).
 expect(njimp.parse_trsl_name("NJ_all_﻿61_coord.csv") == ("NJ_all_", 61, "L"), "TRS-L name with BOM")
