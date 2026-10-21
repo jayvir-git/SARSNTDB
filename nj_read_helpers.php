@@ -754,9 +754,29 @@ if (!function_exists('nj_read_label_pairs')) {
     }
 }
 
+if (!function_exists('nj_read_table_kind')) {
+    /**
+     * Form names and labels for the three junction tables on Junction groups.
+     * cj rows are keyed by start (D-80); nj and tl rows by size, with the start added for a repeated size.
+     *
+     * @return array<string,string>
+     */
+    function nj_read_table_kind($kind)
+    {
+        $kinds = [
+            'nj' => ['kind' => 'nj', 'title' => 'Click a junction', 'check' => 'NjJunction', 'pick' => 'NjPick', 'breakdown' => 'njBreakdown', 'csv' => '', 'file' => '', 'heading' => 'NJ ', 'empty' => 'No junctions from the coordinate table are loaded.'],
+            'cj' => ['kind' => 'cj', 'title' => 'Click a Canonical Junction', 'check' => 'CjJunction', 'pick' => 'CjPick', 'breakdown' => 'cjBreakdown', 'csv' => 'cj', 'file' => 'canonical-', 'heading' => 'Canonical junction ', 'empty' => 'No canonical junctions are loaded.'],
+            'tl' => ['kind' => 'tl', 'title' => 'Click a TRS-L Dependent Junction', 'check' => 'TlJunction', 'pick' => 'TlPick', 'breakdown' => 'tlBreakdown', 'csv' => 'tl', 'file' => 'trsl-', 'heading' => 'TRS-L dependent junction ', 'empty' => 'No TRS-L dependent junctions are loaded yet.'],
+        ];
+
+        return isset($kinds[$kind]) ? $kinds[$kind] : $kinds['nj'];
+    }
+}
+
 if (!function_exists('nj_read_catalog_rows')) {
     /**
-     * Kind 'nj' is the Click a Junction list (small deletions included); 'cj' is the canonical junctions (D-80).
+     * Kind 'nj' is the Click a Junction list (small deletions included); 'cj' the canonical junctions (D-80);
+     * 'tl' the TRS-L dependent junctions (D-81).
      *
      * @return list<array{nj_size:int,coord_tag:string,nj_start:?int,nj_end:?int}>
      */
@@ -765,7 +785,7 @@ if (!function_exists('nj_read_catalog_rows')) {
         if (!nj_read_tables_exist($con)) {
             return [];
         }
-        $kind = $kind === 'cj' ? 'cj' : 'nj';
+        $kind = in_array($kind, ['cj', 'tl'], true) ? $kind : 'nj';
         $res = $con->query(
             "SELECT nj_size, coord_tag, nj_start, nj_end
                FROM vcf_snv_nj_catalog

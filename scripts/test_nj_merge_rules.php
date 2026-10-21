@@ -239,6 +239,30 @@ expect(nj_read_filter_download_name('variant', 30) === 'filter-variants_min30.cs
 $variantTable = nj_read_filter_table($groups, [7 => $denoms], [7 => 12], 'variant', ['min_samples' => 30]);
 expect($variantTable['header_rows'][0][0] === 'Group' && $variantTable['header_rows'][0][1] === 'Type' && $variantTable['header_rows'][0][2] === 'Early', 'variant csv starts with group, type, and early');
 
+// Summary columns follow the checked pairs (D-81).
+$colDenoms = [
+    'Delta (B.1.617.2-like)' => ['COVID-ARTIC-V3' => 40, 'COVID-ARTIC-V4.1' => 20],
+    'Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 50],
+];
+$colHits = ['Delta (B.1.617.2-like)' => ['COVID-ARTIC-V3' => 10], 'Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 25]];
+$colKeys = ['Delta (B.1.617.2-like)|COVID-ARTIC-V3', 'Delta (B.1.617.2-like)|COVID-ARTIC-V4.1', 'Omicron (BA.1-like)|COVID-ARTIC-V4.1'];
+$colCells = nj_read_group_column_cells($colDenoms, $colHits, $colKeys, 'pair', ['min_samples' => 30]);
+expect($colCells['Delta (B.1.617.2-like)|COVID-ARTIC-V3'] === ['n' => 10, 'd' => 40], 'pair cell counts hits over samples');
+expect(!isset($colCells['Delta (B.1.617.2-like)|COVID-ARTIC-V4.1']), 'pair under the minimum is left out');
+$colRows = nj_read_summary_column_rows(
+    [['nj_size' => 894, 'coord_tag' => '', 'nj_start' => 1, 'nj_end' => 894]],
+    [7, 8],
+    [7 => $colDenoms, 8 => ['Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 40]]],
+    ['pairs' => ['894|' => [7 => $colHits, 8 => ['Omicron (BA.1-like)' => ['COVID-ARTIC-V4.1' => 10]]]], 'overall' => ['894|' => [7 => 35, 8 => 10]]],
+    $colKeys,
+    'pair',
+    ['min_samples' => 30]
+);
+expect($colRows[0]['cols']['Delta (B.1.617.2-like)|COVID-ARTIC-V3'] === '25.00', 'one group with data gives its own percent');
+expect($colRows[0]['cols']['Delta (B.1.617.2-like)|COVID-ARTIC-V4.1'] === '-1', 'no group over the minimum gives -1');
+expect($colRows[0]['cols']['Omicron (BA.1-like)|COVID-ARTIC-V4.1'] === '37.50', 'groups are averaged (50% and 25%)');
+expect($colRows[0]['overall'] === '28.41', 'overall averages each group over all its samples (35/110 and 10/40)');
+
 if ($failed > 0) {
     echo "$failed failed\n";
     exit(1);
