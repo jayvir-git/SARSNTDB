@@ -449,12 +449,12 @@ if (!function_exists('nj_read_request_pick')) {
     /**
      * @return array{nj_size:int,coord_tag:string}|null
      */
-    function nj_read_request_pick()
+    function nj_read_request_pick($param = 'NjPick')
     {
-        if (!isset($_GET['NjPick'])) {
+        if (!isset($_GET[$param])) {
             return null;
         }
-        $raw = $_GET['NjPick'];
+        $raw = $_GET[$param];
         if (is_array($raw)) {
             $raw = end($raw);
         }
@@ -487,9 +487,9 @@ if (!function_exists('nj_read_request_junction_picks')) {
     /**
      * @return list<array{nj_size:int,coord_tag:string}>
      */
-    function nj_read_request_junction_picks()
+    function nj_read_request_junction_picks($param = 'NjJunction')
     {
-        $raw = isset($_GET['NjJunction']) ? $_GET['NjJunction'] : [];
+        $raw = isset($_GET[$param]) ? $_GET[$param] : [];
         if (!is_array($raw)) {
             $raw = [$raw];
         }
@@ -756,17 +756,20 @@ if (!function_exists('nj_read_label_pairs')) {
 
 if (!function_exists('nj_read_catalog_rows')) {
     /**
+     * Kind 'nj' is the Click a Junction list (small deletions included); 'cj' is the canonical junctions (D-80).
+     *
      * @return list<array{nj_size:int,coord_tag:string,nj_start:?int,nj_end:?int}>
      */
-    function nj_read_catalog_rows(mysqli $con)
+    function nj_read_catalog_rows(mysqli $con, $kind = 'nj')
     {
         if (!nj_read_tables_exist($con)) {
             return [];
         }
+        $kind = $kind === 'cj' ? 'cj' : 'nj';
         $res = $con->query(
             "SELECT nj_size, coord_tag, nj_start, nj_end
                FROM vcf_snv_nj_catalog
-              WHERE kind = 'nj'
+              WHERE kind = '" . $kind . "'
            ORDER BY nj_size, nj_start"
         );
         if (!$res) {

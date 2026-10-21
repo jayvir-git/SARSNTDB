@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_SQL = ROOT / "sql" / "vcf_snv_nj.sql"
 # Samples with no junction reads in any _coord file are not analyzed (Jim, 2026-10-19).
 NO_NJ_READS_SQL = ROOT / "sql" / "vcf_snv_no_nj_reads.sql"
+# Small deletions and canonical junctions (Jim, 2026-10-21) are added to the catalog by this file.
+SMALL_CANONICAL_SQL = ROOT / "sql" / "vcf_snv_nj_catalog_small_canonical.sql"
+INCOMING = ROOT / "_incoming" / "jim-kelley"
 DRIVE = ROOT / "_incoming" / "jim-kelley" / "2026-09-22_nj-reads-many-projects" / "drive"
 # Reads the gitignored packet copy of the catalog; moving that packet breaks the import silently.
 CATALOG = ROOT / "_incoming" / "jim-kelley" / "2026-09-23_nj-on-junction-page" / "files" / "NJ-table_no_types.csv"
@@ -42,6 +45,7 @@ NJ_BASES = [
     ("PRJEB70597_Vietnam_", "PRJEB70597_Vietnam"),
     ("PRJEB70597_Chile_", "PRJEB70597_Chile"),
     ("Rus_hiseq2500_", "Russia682735"),
+    ("UT_6000_", "UT_6000"),
     ("Argentina-uniq-all_", "PRJEB46220-Argentina"),
     ("SAfr_miseq_0325_", "S_Afr-PRJNA636748"),
     ("India_6000_all_", "India-6000"),
@@ -82,6 +86,7 @@ LIST_FILES = {
     "PRJEB70597_Vietman_unique_csv.txt": "PRJEB70597_Vietnam",
     "PRJEB70597_Chile_unique_csv.txt": "PRJEB70597_Chile",
     "Russia_hiseq2500_unique_csv.txt": "Russia682735",
+    "UT_6000_unique_csv.txt": "UT_6000",
     "Ang_miseq_unique_csv.txt": "Angola_miseq",
     "Argentina_all_unique_csv.txt": "PRJEB46220-Argentina",
     "Botswana_unique_csv.txt": "Botswana",
@@ -499,6 +504,45 @@ def load_only(
             print("eligibility updated", code)
 
 
+def add_catalog_reads(roots: list[Path]) -> None:
+    """Load reads for catalog rows a group has none of yet. Existing reads and eligibility stay as they are."""
+    global ALLOWED
+    cfg = parse_connection_php()
+    mysql_run(SMALL_CANONICAL_SQL.read_text(encoding="utf-8"), cfg)
+    catalog = {(int(size), tag) for size, tag in mysql_pairs("SELECT nj_size, coord_tag FROM vcf_snv_nj_catalog", cfg)}
+    ALLOWED = set(catalog)
+    groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
+    present: dict[int, set[tuple[int, str]]] = {}
+    for gid, size, tag in mysql_pairs("SELECT DISTINCT group_id, nj_size, coord_tag FROM vcf_snv_nj_read", cfg):
+        present.setdefault(int(gid), set()).add((int(size), tag))
+    samples: dict[int, set[str]] = {}
+    for gid, sample in mysql_pairs("SELECT DISTINCT group_id, sample_name FROM vcf_snv_nj_read", cfg):
+        samples.setdefault(int(gid), set()).add(sample)
+    # Both LA groups read the one LA file set; each keeps only its own samples.
+    codes_for: dict[str, list[str]] = {code: [code] for code in groups}
+    codes_for["LA-PRJNA815364"] = ["LA-PRJNA815364", "LA-PRJNA815364_nextseq500"]
+    pending: list[str] = []
+    added: dict[str, int] = {}
+    for root in roots:
+        for file_code, sample, size, tag, reads in iter_coord_rows(root):
+            for code in codes_for.get(file_code, []):
+                gid = groups.get(code)
+                if gid is None or gid not in samples or (size, tag) in present.get(gid, set()):
+                    continue
+                if sample not in samples[gid]:
+                    continue
+                pending.append(
+                    "(" + str(gid) + "," + sql_str(sample) + "," + str(size) + "," + sql_str(tag) + "," + str(max(0, reads)) + ")"
+                )
+                added[code] = added.get(code, 0) + 1
+                if len(pending) >= 400:
+                    insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
+                    pending = []
+    insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
+    for code, n in sorted(added.items()):
+        print(f"added {code} {n}")
+
+
 def main() -> None:
     global ALLOWED
     import argparse
@@ -507,7 +551,15 @@ def main() -> None:
     parser.add_argument("--only", default="", help="Reload these group codes only")
     parser.add_argument("--nj-root", type=Path, action="append", default=None)
     parser.add_argument("--list-root", type=Path, action="append", default=None)
+    parser.add_argument(
+        "--add-catalog-reads",
+        action="store_true",
+        help="Load reads for catalog rows a group lacks, from --nj-root (default: every packet)",
+    )
     args = parser.parse_args()
+    if args.add_catalog_reads:
+        add_catalog_reads(args.nj_root or [INCOMING])
+        return
     if args.only.strip():
         load_only(
             [part.strip() for part in args.only.split(",") if part.strip()],
@@ -545,6 +597,9 @@ def main() -> None:
             + ")"
         )
     insert_values("vcf_snv_nj_catalog", "nj_size,nj_start,nj_end,coord_tag,kind", catalog_sql, cfg)
+    mysql_run(SMALL_CANONICAL_SQL.read_text(encoding="utf-8"), cfg)
+    for size, tag in mysql_pairs("SELECT nj_size, coord_tag FROM vcf_snv_nj_catalog", cfg):
+        ALLOWED.add((int(size), tag))
 
     list_root = DRIVE / "sample_lists"
     loaded_lists: dict[str, int] = {}

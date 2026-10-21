@@ -103,6 +103,7 @@ GROUP_LABELS = {
     "PRJEB70597_Vietnam": "Vietnam Illumina PRJEB70597",
     "PRJEB70597_Chile": "Chile Illumina PRJEB70597",
     "Russia682735": "Russia HiSeq 2500 PRJNA682735",
+    "UT_6000": "USA UT NovaSeq 6000 PRJNA614995",
     "S_Afr-PRJNA636748": "South Africa MiSeq",
     "Thailand_mix": "Thailand",
     "Est-mix": "Estonia many #s",

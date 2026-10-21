@@ -78,6 +78,7 @@ if (!function_exists('vcf_snv_workbook_visible_codes')) {
             'PRJEB70597_Vietnam',
             'PRJEB70597_Chile',
             'Russia682735',
+            'UT_6000',
         ];
     }
 }
@@ -137,6 +138,7 @@ if (!function_exists('vcf_snv_group_display_label')) {
             'PRJEB70597_Vietnam' => 'Vietnam Illumina PRJEB70597',
             'PRJEB70597_Chile' => 'Chile Illumina PRJEB70597',
             'Russia682735' => 'Russia HiSeq 2500 PRJNA682735',
+            'UT_6000' => 'USA UT NovaSeq 6000 PRJNA614995',
         ];
         $code = (string) $code;
         if (isset($labels[$code])) {

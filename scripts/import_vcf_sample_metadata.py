@@ -67,6 +67,8 @@ GROUP_PROJECT = {
     "PRJEB70597_Vietnam": "PRJEB70597",
     "PRJEB70597_Chile": "PRJEB70597",
     "Russia682735": "PRJNA682735",
+    # 21 Oct: row 36 of Jim's groups sheet.
+    "UT_6000": "PRJNA614995",
 }
 
 EXTRA_META_FILES = {
@@ -120,6 +122,7 @@ DISPLAY_LABELS = {
     "PRJEB70597_Vietnam": "Vietnam Illumina PRJEB70597",
     "PRJEB70597_Chile": "Chile Illumina PRJEB70597",
     "Russia682735": "Russia HiSeq 2500 PRJNA682735",
+    "UT_6000": "USA UT NovaSeq 6000 PRJNA614995",
 }
 
 OCT12_META_DIR = (
@@ -151,6 +154,10 @@ OCT19_META_FILES = {
     "run_metadata.v05-PRJEB70597.csv": "PRJEB70597",
     "run_metadata.v05-PRJNA682735.csv": "PRJNA682735",
 }
+
+# 21 Oct: USA UT (row 36 of the groups sheet), staged in that packet.
+OCT21_META_DIR = ROOT / "_incoming" / "jim-kelley" / "2026-10-21_small-del-canonical" / "staging" / "files"
+OCT21_META_FILES = {"run_metadata.v05-PRJNA614995.csv": "PRJNA614995"}
 
 
 def projects_for(code: str) -> tuple[str, ...]:
@@ -286,7 +293,11 @@ def stream_metadata(wanted_names: set[str]) -> dict[str, dict[str, str]]:
 
 
 def _stream_oct12(hits: dict[str, dict[str, str]], wanted_names: set[str]) -> dict[str, dict[str, str]]:
-    for meta_dir, meta_files in ((OCT12_META_DIR, OCT12_META_FILES), (OCT19_META_DIR, OCT19_META_FILES)):
+    for meta_dir, meta_files in (
+        (OCT12_META_DIR, OCT12_META_FILES),
+        (OCT19_META_DIR, OCT19_META_FILES),
+        (OCT21_META_DIR, OCT21_META_FILES),
+    ):
         _stream_meta_dir(hits, wanted_names, meta_dir, meta_files)
     return hits
 
