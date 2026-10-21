@@ -65,6 +65,11 @@ njimp.ALLOWED = {(int(r[0]), r[3]) for r in rows}
 expect(parse_coord_name("NJ_all_50_11565_coord.csv") == ("NJ-PRJNA708324", 50, "11565"), "small deletion file loads")
 expect(parse_coord_name("UT_6000_21486_coord.csv") == ("UT_6000", 21486, ""), "Utah canonical file loads")
 njimp.ALLOWED = set()
+# 21 Oct Zoom: TRS-L dependent junctions get an L tag; some of Jim's names carry a BOM (D-81).
+expect(njimp.parse_trsl_name("NJ_all_﻿61_coord.csv") == ("NJ_all_", 61, "L"), "TRS-L name with BOM")
+expect(njimp.parse_trsl_name("Argentina-uniq-all_2723_71_coord.csv") == ("Argentina-uniq-all_", 2723, "L71"), "TRS-L second number in the tag")
+expect(njimp.parse_trsl_name("LA_500_miseq_635_coord.csv") == ("LA_500_miseq_", 635, "L"), "TRS-L LA base")
+expect(njimp.parse_trsl_name("NJ_all_635_coord1.csv") is None, "TRS-L coord1 skipped")
 
 if failed:
     print(failed, "failed")

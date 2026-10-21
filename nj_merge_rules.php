@@ -653,7 +653,7 @@ if (!function_exists('nj_read_summary_column_rows')) {
      * @param array<string,mixed> $options
      * @return list<array<string,mixed>>
      */
-    function nj_read_summary_column_rows(array $catalog, array $groupIds, array $denoms, array $hits, array $columnKeys, $by, array $options)
+    function nj_read_summary_column_rows(array $catalog, array $groupIds, array $denoms, array $hits, array $columnKeys, $by, array $options, $dataGroups = null)
     {
         $opt = nj_read_coerce_merge($options);
         $min = (int) $opt['min_samples'];
@@ -665,6 +665,10 @@ if (!function_exists('nj_read_summary_column_rows')) {
             $overall = [];
             foreach ($groupIds as $gid) {
                 $gid = (int) $gid;
+                if (is_array($dataGroups) && !isset($dataGroups[$gid])) {
+                    // No files for this table in this group: left out of the average, like a group under the minimum.
+                    continue;
+                }
                 $groupDenoms = isset($denoms[$gid]) ? $denoms[$gid] : [];
                 $groupHits = isset($hits['pairs'][$key][$gid]) ? $hits['pairs'][$key][$gid] : [];
                 $cells = nj_read_group_column_cells($groupDenoms, $groupHits, $columnKeys, $by, $opt);
@@ -1087,7 +1091,8 @@ if (!function_exists('nj_read_junction_download_name')) {
             return 'junctions_' . $groups . '.zip';
         }
         $name = (string) (int) $size;
-        $tag = (string) $coordTag;
+        // TRS-L tags (L, L71) name the file without the L: 61_..., 2723_71_...
+        $tag = ltrim((string) $coordTag, 'L');
         if ($tag !== '') {
             $name .= '_' . $tag;
         }

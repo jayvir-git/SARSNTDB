@@ -543,6 +543,81 @@ def add_catalog_reads(roots: list[Path]) -> None:
         print(f"added {code} {n}")
 
 
+# TRS-L dependent junctions (Jim, Zoom 2026-10-21, D-81): Jim's NJ_data_TRS_L folder, {base}{number}[_{tag}]_coord.csv.
+# Stored with coord_tag "L" + tag so they never share a key with Click a Junction rows (2723 is in both).
+TRSL_TAG = "L"
+
+
+def parse_trsl_name(filename: str) -> tuple[str, int, str] | None:
+    """Return (file base, number, coord tag) for a TRS-L coord file; some names carry a BOM before the number."""
+    name = Path(filename.replace("\\", "/")).name.replace("\ufeff", "")
+    if not name.endswith("_coord.csv"):
+        return None
+    bases = sorted({base for base, _code in NJ_BASES} | {"LA_500_miseq_"}, key=len, reverse=True)
+    for base in bases:
+        if not name.startswith(base):
+            continue
+        middle = name[len(base) : -len("_coord.csv")]
+        number, _, tag = middle.partition("_")
+        if not number.isdigit() or (tag and not tag.isdigit()):
+            return None
+        return base, int(number), TRSL_TAG + tag
+    return None
+
+
+def load_trsl(root: Path) -> None:
+    """Add TRS-L catalog rows (kind tl) and their reads; groups without files stay without rows (shown as -1)."""
+    cfg = parse_connection_php()
+    groups = {code: int(gid) for gid, code in mysql_pairs("SELECT id, code FROM vcf_snv_group", cfg)}
+    samples: dict[int, set[str]] = {}
+    for gid, sample in mysql_pairs("SELECT DISTINCT group_id, sample_name FROM vcf_snv_nj_read", cfg):
+        samples.setdefault(int(gid), set()).add(sample)
+    codes_for: dict[str, list[str]] = {base: [code] for base, code in NJ_BASES}
+    # Both LA groups read the one LA file set; each keeps only its own samples.
+    codes_for["LA_500_miseq_"] = ["LA-PRJNA815364", "LA-PRJNA815364_nextseq500"]
+    codes_for["LA_all_"] = ["LA-PRJNA815364", "LA-PRJNA815364_nextseq500"]
+    mysql_run("DELETE FROM vcf_snv_nj_read WHERE coord_tag LIKE 'L%'; DELETE FROM vcf_snv_nj_catalog WHERE kind = 'tl';", cfg)
+    keys: set[tuple[int, str]] = set()
+    pending: list[str] = []
+    added: dict[str, int] = {}
+    for path in sorted(root.rglob("*.csv")):
+        parsed = parse_trsl_name(path.name)
+        if parsed is None:
+            print("skipped", path.name.encode("ascii", "replace").decode())
+            continue
+        base, number, tag = parsed
+        keys.add((number, tag))
+        for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            parts = line.strip().split(",")
+            if len(parts) < 2 or parts[0].strip() == "" or parts[0].lower().startswith("sample"):
+                continue
+            try:
+                reads = int(float(parts[1]))
+            except ValueError:
+                continue
+            for code in codes_for.get(base, []):
+                gid = groups.get(code)
+                if gid is None or parts[0].strip() not in samples.get(gid, set()):
+                    continue
+                pending.append(
+                    "(" + str(gid) + "," + sql_str(parts[0].strip()) + "," + str(number) + "," + sql_str(tag) + "," + str(max(0, reads)) + ")"
+                )
+                added[code] = added.get(code, 0) + 1
+        if len(pending) >= 400:
+            insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
+            pending = []
+    insert_values("vcf_snv_nj_read", "group_id,sample_name,nj_size,coord_tag,read_count", pending, cfg)
+    insert_values(
+        "vcf_snv_nj_catalog",
+        "nj_size,nj_start,nj_end,coord_tag,kind",
+        ["(" + str(number) + ",NULL,NULL," + sql_str(tag) + ",'tl')" for number, tag in sorted(keys)],
+        cfg,
+    )
+    print("catalog tl", len(keys))
+    for code, n in sorted(added.items()):
+        print(f"trsl {code} {n}")
+
+
 def main() -> None:
     global ALLOWED
     import argparse
@@ -556,7 +631,11 @@ def main() -> None:
         action="store_true",
         help="Load reads for catalog rows a group lacks, from --nj-root (default: every packet)",
     )
+    parser.add_argument("--trsl-root", type=Path, default=None, help="Load TRS-L dependent junctions from this folder")
     args = parser.parse_args()
+    if args.trsl_root is not None:
+        load_trsl(args.trsl_root)
+        return
     if args.add_catalog_reads:
         add_catalog_reads(args.nj_root or [INCOMING])
         return

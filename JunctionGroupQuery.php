@@ -169,7 +169,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $cjSummary = nj_read_summary_column_rows($cjCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
     // Click a TRS-L Dependent Junction (Jim, Zoom 2026-10-21, D-81); groups without its files show -1.
     $tlCatalog = nj_read_catalog_rows($con, 'tl');
-    $tlSummary = nj_read_summary_column_rows($tlCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
+    $tlSummary = nj_read_summary_column_rows($tlCatalog, $njGroupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions, nj_read_tag_data_groups($con, 'L'));
     $njChartNames = nj_read_chart_group_names($njGroupCodes);
 } else {
     $dbError = 'Database connection not available.';
@@ -342,11 +342,16 @@ function jq_breakdown_csv(mysqli $con, array $groupRows, array $cols, $by, array
     }
     $raw = nj_read_breakdown_raw($con, $ids, $size, $tag, $minReads, $ngeneIds);
     $cells = nj_read_fold_breakdown($raw, $cols, $by, $options);
+    $dataGroups = nj_read_tag_data_groups($con, $tag);
     foreach ($groupRows as $group) {
         $line = [$group['label']];
         foreach ($cols as $csvKey) {
             $cellKey = (int) $group['id'] . "\t" . $csvKey;
             $cell = isset($cells[$cellKey]) ? $cells[$cellKey] : ['n' => 0, 'd' => 0];
+            if (is_array($dataGroups) && !isset($dataGroups[(int) $group['id']])) {
+                $line[] = '-1';
+                continue;
+            }
             $line[] = nj_read_breakdown_display($cell['n'], $cell['d'], $options['min_samples'], !empty($options['show_below']));
         }
         $lines[] = nj_read_csv_line($line);
@@ -453,7 +458,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
-        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ['NJ Size', 'start'];
+        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ($csvTable['kind'] === 'tl' ? ['Junction', 'start'] : ['NJ Size', 'start']);
         $csvHead = [$sizeHead[0], $sizeHead[1], 'end'];
         foreach ($njSelectedCols as $csvCol) {
             $colHead = nj_read_column_heads($csvCol, $njBy);
@@ -466,7 +471,11 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
             if ($csvCanonical) {
                 $second = ($csvRow['nj_start'] === null || $csvRow['nj_end'] === null) ? '' : $csvRow['nj_end'] - $csvRow['nj_start'] + 1;
             }
-            $csvLine = [$csvRow['nj_size'], $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
+            $first = (string) $csvRow['nj_size'];
+            if ($csvTable['kind'] === 'tl' && strlen($csvRow['coord_tag']) > 1) {
+                $first .= '_' . substr($csvRow['coord_tag'], 1);
+            }
+            $csvLine = [$first, $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
             foreach ($njSelectedCols as $csvCol) {
                 $csvLine[] = isset($csvRow['cols'][$csvCol]) ? $csvRow['cols'][$csvCol] : '-1';
             }

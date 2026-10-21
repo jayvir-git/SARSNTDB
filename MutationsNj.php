@@ -87,7 +87,8 @@ if (!isset($njDenoms) || !is_array($njDenoms) || !isset($njHits) || !is_array($n
     $njHits = nj_read_junction_hits($con, $groupIds, $minReads, $ngeneIds);
 }
 // Summary columns are the pairs (or variants, or primers) checked in the box, then Overall (Jim, Zoom 2026-10-21, D-81).
-$tableSummary = nj_read_summary_column_rows($catalog, $groupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions);
+$njDataGroups = $njKind['kind'] === 'tl' ? nj_read_tag_data_groups($con, 'L') : null;
+$tableSummary = nj_read_summary_column_rows($catalog, $groupIds, $njDenoms, $njHits, $njSelectedCols, $njBy, $njOptions, $njDataGroups);
 $summaryByPick = [];
 foreach ($tableSummary as $summaryRow) {
     $summaryByPick[nj_read_pick_value($summaryRow['nj_size'], $summaryRow['coord_tag'])] = $summaryRow;
@@ -120,7 +121,12 @@ if ($njCanonical) {
     echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names. Three groups at size 894 download as <code>894_Arg_Port550_NJ.csv</code>. When another junction has the same size, its start is added, as in <code>2766_1883_NJ.csv</code>. Sizes under 100 are the small deletions. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
 }
 echo '<div class="nj-datagrid" id="' . $njCheckName . '"><table class="sortable"><thead><tr class="dark">';
-echo $njCanonical ? '<th></th><th>Start</th><th>Size</th><th>End</th>' : '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
+if ($njKind['kind'] === 'tl') {
+    // Jim's TRS-L files are named by this number; start and end come when he sends the junction list.
+    echo '<th></th><th>Junction</th><th>Start</th><th>End</th>';
+} else {
+    echo $njCanonical ? '<th></th><th>Start</th><th>Size</th><th>End</th>' : '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
+}
 foreach ($summaryHeads as $headText) {
     echo '<th>' . htmlspecialchars($headText, ENT_QUOTES, 'UTF-8') . '</th>';
 }
@@ -145,7 +151,7 @@ foreach ($catalog as $row) {
     echo '<tr class="nj-pick-row' . ($current ? ' nj-pick-current' : '') . '" style="' . $rowStyle . '">';
     echo '<td><input type="checkbox" name="' . $njCheckName . '[]" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '"' . $junctionChecked . ' /></td>';
     echo '<td><button type="submit" class="nj-show" name="' . $njPickName . '" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '" data-nj-breakdown="' . $njBreakdownId . '">';
-    echo (int) $row['nj_size'];
+    echo (int) $row['nj_size'] . ($njKind['kind'] === 'tl' && strlen((string) $row['coord_tag']) > 1 ? '_' . htmlspecialchars(substr((string) $row['coord_tag'], 1), ENT_QUOTES, 'UTF-8') : '');
     echo '</button></td>';
     if ($njCanonical) {
         // Canonical rows are keyed by start (nj_size holds it); the size is end - start + 1, as in Jim's del_coord_cjs.csv.
@@ -206,6 +212,9 @@ foreach (array_slice($breakdownRows, 0, $njBreakdownMax) as $pickRow) {
     $start = $pickRow['nj_start'] === null ? '' : (string) $pickRow['nj_start'];
     $end = $pickRow['nj_end'] === null ? '' : (string) $pickRow['nj_end'];
     echo '<h4 class="search-header" style="margin-top:14px;">' . htmlspecialchars($njKind['heading'], ENT_QUOTES, 'UTF-8') . (int) $pickRow['nj_size'];
+    if ($njKind['kind'] === 'tl' && strlen((string) $pickRow['coord_tag']) > 1) {
+        echo '_' . htmlspecialchars(substr((string) $pickRow['coord_tag'], 1), ENT_QUOTES, 'UTF-8');
+    }
     if ($start !== '' || $end !== '') {
         echo ' (' . htmlspecialchars($start, ENT_QUOTES, 'UTF-8') . '–' . htmlspecialchars($end, ENT_QUOTES, 'UTF-8') . ')';
     }
@@ -230,7 +239,8 @@ foreach (array_slice($breakdownRows, 0, $njBreakdownMax) as $pickRow) {
     $prevColor = $color1;
     foreach ($njGroupRows as $group) {
         $gid = (int) $group['id'];
-        $cells = nj_read_group_column_cells(
+        $hasData = !is_array($njDataGroups) || isset($njDataGroups[$gid]);
+        $cells = !$hasData ? [] : nj_read_group_column_cells(
             isset($njDenoms[$gid]) ? $njDenoms[$gid] : [],
             isset($njHits['pairs'][$pickKey][$gid]) ? $njHits['pairs'][$pickKey][$gid] : [],
             $njSelectedCols,
@@ -243,8 +253,8 @@ foreach (array_slice($breakdownRows, 0, $njBreakdownMax) as $pickRow) {
         echo '<td class="nj-group" style="' . $rowStyle . '">' . htmlspecialchars($group['label'], ENT_QUOTES, 'UTF-8') . '</td>';
         foreach ($njSelectedCols as $key) {
             $cell = isset($cells[$key]) ? $cells[$key] : ['n' => 0, 'd' => 0];
-            $text = nj_read_breakdown_display($cell['n'], $cell['d'], $njMinSamples, $njShowBelow);
-            $title = (int) $cell['n'] . ' / ' . (int) $cell['d'];
+            $text = $hasData ? nj_read_breakdown_display($cell['n'], $cell['d'], $njMinSamples, $njShowBelow) : '-1';
+            $title = $hasData ? (int) $cell['n'] . ' / ' . (int) $cell['d'] : 'no TRS-L files for this group yet';
             echo '<td title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</td>';
         }
         echo '</tr>';
