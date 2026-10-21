@@ -1044,6 +1044,20 @@ if (!function_exists('nj_read_group_file_abbrev')) {
             'PRJNA622837-Broad_Inst' => 'Broad',
             'Thailand_mix' => 'Thai',
             'Russia682735' => 'Rus',
+            // Groups without an entry were cut to 8 characters (RI became PRJNA744; Jim, 2026-10-21, D-82).
+            'PRJNA744530-RI' => 'RI',
+            'PRJNA746690-CA' => 'CA',
+            'Denmark-nextseq550' => 'Den550',
+            'PRJEB72496-Denmark-6000' => 'Den6000',
+            'Est-mix' => 'Est',
+            'PRJNA788338_Mauritius' => 'Mau',
+            'PRJNA718451-Mozambique' => 'Moz',
+            'PRJNA728463-Israel' => 'Isr',
+            'PRJEB46969-Lebanon' => 'Leb',
+            'PRJNA708134-Philippines' => 'Phil',
+            'PRJEB70597_Vietnam' => 'Viet',
+            'PRJEB70597_Chile' => 'Chile',
+            'UT_6000' => 'UT',
         ];
         $code = (string) $code;
         if (isset($map[$code])) {

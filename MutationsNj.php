@@ -98,8 +98,8 @@ $checkedJunctions = nj_read_request_junction_picks($njCheckName);
 foreach ($checkedJunctions as $junctionPick) {
     $njJunctionOn[nj_read_pick_value($junctionPick['nj_size'], $junctionPick['coord_tag'])] = true;
 }
-// One group table per checked junction, in list order, up to this many (Jim, Zoom 2026-10-21, D-81).
-$njBreakdownMax = 25;
+// One group table per checked junction, in list order, up to this many: covers every TRS-L row (Jim, 2026-10-21, D-81, D-82).
+$njBreakdownMax = 100;
 $njFileCodes = [];
 foreach ($njGroupRows as $njFileGroup) {
     $njFileCodes[] = (string) $njFileGroup['code'];
