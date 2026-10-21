@@ -163,6 +163,9 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $njHits = nj_read_junction_hits($con, $njGroupIds, $njMinReads, $njNgeneIds);
     $njCatalog = nj_read_catalog_rows($con);
     $njSummary = nj_read_summary_rows($njCatalog, $njGroupIds, $njDenoms, $njHits, $njOptions);
+    // Click a Canonical Junction (Jim, 2026-10-21, D-80): same hits and denominators, canonical catalog rows.
+    $cjCatalog = nj_read_catalog_rows($con, 'cj');
+    $cjSummary = nj_read_summary_rows($cjCatalog, $njGroupIds, $njDenoms, $njHits, $njOptions);
     $njChartNames = nj_read_chart_group_names($njGroupCodes);
 } else {
     $dbError = 'Database connection not available.';
@@ -172,6 +175,8 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     $njAllDenoms = [];
     $njSummary = [];
     $njCatalog = [];
+    $cjSummary = [];
+    $cjCatalog = [];
     $njChartNames = [];
 }
 
@@ -369,13 +374,21 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     }
     $csvCodes = jq_group_codes($njGroupRows);
     $csvReady = $njSelectedCols && $njGroupRows;
+    // cjjunctions, cjbreakdown and cjsummary are the Click a Canonical Junction downloads.
+    $csvCanonical = in_array($csvKind, ['cjjunctions', 'cjbreakdown', 'cjsummary'], true);
+    if ($csvCanonical) {
+        $csvKind = substr($csvKind, 2);
+    }
+    $csvCatalog = $csvCanonical ? $cjCatalog : $njCatalog;
+    $csvSummary = $csvCanonical ? $cjSummary : $njSummary;
+    $csvCheckName = $csvCanonical ? 'CjJunction' : 'NjJunction';
     if ($csvKind === 'junctions' && $csvReady) {
         $catalogPicks = [];
-        foreach ($njCatalog as $catalogRow) {
+        foreach ($csvCatalog as $catalogRow) {
             $catalogPicks[nj_read_pick_value($catalogRow['nj_size'], $catalogRow['coord_tag'])] = true;
         }
         $chosen = [];
-        foreach (nj_read_request_junction_picks() as $junctionPick) {
+        foreach (nj_read_request_junction_picks($csvCheckName) as $junctionPick) {
             $pickValue = nj_read_pick_value($junctionPick['nj_size'], $junctionPick['coord_tag']);
             if (isset($catalogPicks[$pickValue])) {
                 $chosen[] = $junctionPick;
@@ -397,13 +410,13 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                 );
             }
             header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename="' . nj_read_junction_download_name(0, $csvCodes, true) . '"');
+            header('Content-Disposition: attachment; filename="' . ($csvCanonical ? 'canonical-' : '') . nj_read_junction_download_name(0, $csvCodes, true) . '"');
             echo nj_read_zip_bytes($files);
             exit;
         }
     }
-    $breakdownPick = $njPick;
-    $checkedForCsv = nj_read_request_junction_picks();
+    $breakdownPick = $csvCanonical ? nj_read_request_pick('CjPick') : $njPick;
+    $checkedForCsv = nj_read_request_junction_picks($csvCheckName);
     if (count($checkedForCsv) === 1) {
         $breakdownPick = $checkedForCsv[0];
     }
@@ -425,16 +438,21 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     }
     header('Content-Type: text/csv; charset=UTF-8');
     $csvName = $csvKind === 'summary'
-        ? nj_read_summary_download_name($csvCodes)
+        ? ($csvCanonical ? 'canonical-' : '') . nj_read_summary_download_name($csvCodes)
         : 'junction-' . preg_replace('/[^a-z]+/', '', $csvKind) . '.csv';
     header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
-        echo nj_read_csv_line(['NJ Size', 'start', 'end', 'Delta V3', 'Omi V3', 'Delta V4.1', 'Omi V4.1', 'Overall Average']) . "\n";
-        foreach ($njSummary as $csvRow) {
+        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ['NJ Size', 'start'];
+        echo nj_read_csv_line([$sizeHead[0], $sizeHead[1], 'end', 'Delta V3', 'Omi V3', 'Delta V4.1', 'Omi V4.1', 'Overall Average']) . "\n";
+        foreach ($csvSummary as $csvRow) {
+            $second = $csvRow['nj_start'] === null ? '' : $csvRow['nj_start'];
+            if ($csvCanonical) {
+                $second = ($csvRow['nj_start'] === null || $csvRow['nj_end'] === null) ? '' : $csvRow['nj_end'] - $csvRow['nj_start'] + 1;
+            }
             echo nj_read_csv_line([
                 $csvRow['nj_size'],
-                $csvRow['nj_start'] === null ? '' : $csvRow['nj_start'],
+                $second,
                 $csvRow['nj_end'] === null ? '' : $csvRow['nj_end'],
                 $csvRow['delta_v3'],
                 $csvRow['omi_v3'],
@@ -783,7 +801,13 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
             <div class="jq-filter-block">
                 <strong>Click a junction</strong>
                 <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('summary'), ENT_QUOTES, 'UTF-8'); ?>">Download the summary table (<?php echo htmlspecialchars(nj_read_summary_download_name(jq_group_codes($njGroupRows)), ENT_QUOTES, 'UTF-8'); ?>)</a></p>
-                <?php include __DIR__ . '/MutationsNj.php'; ?>
+                <?php $njTableKind = 'nj'; include __DIR__ . '/MutationsNj.php'; ?>
+            </div>
+            <div class="jq-filter-block">
+                <strong>Click a Canonical Junction</strong>
+                <p style="margin:6px 0;"><a href="<?php echo htmlspecialchars(jq_csv_query('cjsummary'), ENT_QUOTES, 'UTF-8'); ?>">Download the summary table (canonical-<?php echo htmlspecialchars(nj_read_summary_download_name(jq_group_codes($njGroupRows)), ENT_QUOTES, 'UTF-8'); ?>)</a></p>
+                <input type="hidden" name="CjPick" value="<?php $cjPickNow = nj_read_request_pick('CjPick'); echo $cjPickNow === null ? '' : htmlspecialchars(nj_read_pick_value($cjPickNow['nj_size'], $cjPickNow['coord_tag']), ENT_QUOTES, 'UTF-8'); ?>" />
+                <?php $njTableKind = 'cj'; include __DIR__ . '/MutationsNj.php'; $njTableKind = 'nj'; ?>
             </div>
             <div class="jq-filter-block" data-jq-all="primer">
                 <strong>Primer</strong>
@@ -1016,24 +1040,25 @@ if (window.JunctionQueryCharts) {
         bindAll($(this));
     });
     $('button.nj-show').on('click', function () {
-        $(this).closest('tr').find('input[name="NjJunction[]"]').prop('checked', true);
+        $(this).closest('tr').find('input[type="checkbox"]').prop('checked', true);
     });
     $('.nj-pick-row').on('click', function (ev) {
         if ($(ev.target).closest('button, input').length) {
             return;
         }
-        $(this).find('input[name="NjJunction[]"]').prop('checked', true);
+        $(this).find('input[type="checkbox"]').prop('checked', true);
         var btn = $(this).find('button.nj-show').get(0);
         if (btn) {
             btn.click();
         }
     });
-    $('#NjJunction').on('change', 'input[name="NjJunction[]"]', function () {
+    $('#NjJunction, #CjJunction').on('change', 'input[type="checkbox"]', function () {
         submitFilterForm();
     });
-    $('.nj-select-all[data-nj-target="NjJunction"]').on('change', function () {
-        var breakdown = document.getElementById('njBreakdown');
-        var checked = $('#NjJunction input[name="NjJunction[]"]:checked').length;
+    $('.nj-select-all[data-nj-target="NjJunction"], .nj-select-all[data-nj-target="CjJunction"]').on('change', function () {
+        var target = $(this).attr('data-nj-target');
+        var breakdown = document.getElementById(target === 'CjJunction' ? 'cjBreakdown' : 'njBreakdown');
+        var checked = $('#' + target + ' input[type="checkbox"]:checked').length;
         if (breakdown && checked !== 1) {
             breakdown.style.display = 'none';
         }
@@ -1043,17 +1068,17 @@ if (window.JunctionQueryCharts) {
         form.addEventListener('submit', function (ev) {
             var jump = ev.submitter && ev.submitter.classList && ev.submitter.classList.contains('nj-show');
             try {
-                sessionStorage.setItem('jqScrollY', jump ? 'breakdown' : String(window.scrollY || window.pageYOffset || 0));
+                sessionStorage.setItem('jqScrollY', jump ? (ev.submitter.getAttribute('data-nj-breakdown') || 'njBreakdown') : String(window.scrollY || window.pageYOffset || 0));
             } catch (err) {}
         });
     }
-    var breakdown = document.getElementById('njBreakdown');
     var savedScroll = null;
     try {
         savedScroll = sessionStorage.getItem('jqScrollY');
         sessionStorage.removeItem('jqScrollY');
     } catch (err) {}
-    if (savedScroll === 'breakdown' && breakdown) {
+    var breakdown = (savedScroll === 'njBreakdown' || savedScroll === 'cjBreakdown') ? document.getElementById(savedScroll) : null;
+    if (breakdown) {
         breakdown.scrollIntoView({block: 'start'});
     } else if (savedScroll !== null && savedScroll !== '') {
         var scrollY = parseInt(savedScroll, 10);

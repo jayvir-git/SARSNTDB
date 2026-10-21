@@ -53,6 +53,17 @@ expect(parse_coord_name("LA_all_2766_coord.csv") == ("LA-PRJNA815364", 2766, "")
 expect(parse_coord_name("LA_all_2766_1883_coord.csv") == ("LA-PRJNA815364", 2766, "1883"), "row 69 uses 2766_1883")
 expect(parse_coord_name("LA_all_118_29686_coord.csv") == ("LA-PRJNA815364", 118, "29686"), "duplicate 118 uses its start")
 expect(parse_coord_name("LA_all_50_11565_coord.csv") is None, "untagged extra number stays out")
+# 21 Oct: small deletions and canonical junctions come from the catalog SQL (D-80).
+import re
+sql = njimp.SMALL_CANONICAL_SQL.read_text(encoding="utf-8")
+rows = re.findall(r"\((\d+), (\d+), (\d+), '(\d*)', '(nj|cj)'\)", sql)
+expect(len([r for r in rows if r[4] == "nj"]) == 9, "nine small deletions")
+expect(len([r for r in rows if r[4] == "cj"]) == 8, "eight canonical junctions, 28190 included")
+expect(all(int(r[2]) - int(r[1]) + 1 == int(r[0]) for r in rows if r[4] == "nj"), "small deletion size is end - start + 1")
+expect(all(r[0] == r[1] and r[3] == "" for r in rows if r[4] == "cj"), "canonical rows are keyed by start")
+njimp.ALLOWED = {(int(r[0]), r[3]) for r in rows}
+expect(parse_coord_name("NJ_all_50_11565_coord.csv") == ("NJ-PRJNA708324", 50, "11565"), "small deletion file loads")
+expect(parse_coord_name("UT_6000_21486_coord.csv") == ("UT_6000", 21486, ""), "Utah canonical file loads")
 njimp.ALLOWED = set()
 
 if failed:

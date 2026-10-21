@@ -73,6 +73,7 @@ EARLY_BY_CODE = {
     "PRJNA708134-Philippines": "PRJNA708134-Philippines_2020-2021.txt",
     "PRJEB70597_Vietnam": "PRJEB70597_2020-2021.txt",
     "PRJEB70597_Chile": "PRJEB70597_2020-2021.txt",
+    "UT_6000": "UT_6000_2020-Jul21.txt",
 }
 
 
@@ -118,10 +119,12 @@ def main() -> None:
     if EARLY_DIR.is_dir():
         for path in EARLY_DIR.glob("*.txt"):
             lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
-    # 19 Oct groups: Early lists staged in that packet.
-    oct19 = ROOT / "_incoming" / "jim-kelley" / "2026-10-19_zoom-early-groups" / "staging" / "files"
-    if oct19.is_dir():
-        for path in oct19.glob("*.txt"):
+    # 19 Oct groups and 21 Oct USA UT: Early lists staged in those packets.
+    for packet in ("2026-10-19_zoom-early-groups", "2026-10-21_small-del-canonical"):
+        staged = ROOT / "_incoming" / "jim-kelley" / packet / "staging" / "files"
+        if not staged.is_dir():
+            continue
+        for path in staged.glob("*.txt"):
             lists[path.name] = ids_in_text(path.read_text(encoding="utf-8", errors="replace"))
             lists[path.stem] = lists[path.name]
     if OCT12_EARLY_DIR.is_dir():
