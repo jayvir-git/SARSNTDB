@@ -475,7 +475,7 @@ if (!function_exists('nj_read_parse_pick')) {
         }
         $size = substr($raw, 0, $bar);
         $tag = substr($raw, $bar + 1);
-        if ($size === '' || !ctype_digit($size) || strlen($tag) > 16 || !preg_match('/^[0-9]*$/', $tag)) {
+        if ($size === '' || !ctype_digit($size) || strlen($tag) > 16 || !preg_match('/^L?[0-9]*$/', $tag)) {
             return null;
         }
 
@@ -757,7 +757,8 @@ if (!function_exists('nj_read_label_pairs')) {
 if (!function_exists('nj_read_table_kind')) {
     /**
      * Form names and labels for the three junction tables on Junction groups.
-     * cj rows are keyed by start (D-80); nj and tl rows by size, with the start added for a repeated size.
+     * cj rows are keyed by start (D-80); nj rows by size, with the start added for a repeated size;
+     * tl rows by the number in Jim's file names, coord_tag L plus any second number (D-81).
      *
      * @return array<string,string>
      */
@@ -770,6 +771,40 @@ if (!function_exists('nj_read_table_kind')) {
         ];
 
         return isset($kinds[$kind]) ? $kinds[$kind] : $kinds['nj'];
+    }
+}
+
+if (!function_exists('nj_read_tag_data_groups')) {
+    /**
+     * Groups that have TRS-L files, for a TRS-L tag (L, L71 ...); null for other junctions (every group counts).
+     * Jim has crunched TRS-L junctions for some groups only; the others show -1, not 0 (Zoom 2026-10-21, D-81).
+     *
+     * @return array<int,bool>|null
+     */
+    function nj_read_tag_data_groups(mysqli $con, $coordTag)
+    {
+        if (substr((string) $coordTag, 0, 1) !== 'L') {
+            return null;
+        }
+        static $cache = null;
+        if ($cache === null) {
+            $cache = [];
+            // Probes the primary key (group_id, nj_size, coord_tag) once per TRS-L catalog row instead of scanning reads.
+            $res = $con->query(
+                "SELECT g.id FROM vcf_snv_group g
+                  WHERE EXISTS (SELECT 1 FROM vcf_snv_nj_catalog c STRAIGHT_JOIN vcf_snv_nj_read r
+                                    ON r.group_id = g.id AND r.nj_size = c.nj_size AND r.coord_tag = c.coord_tag
+                                 WHERE c.kind = 'tl')"
+            );
+            if ($res) {
+                while ($row = $res->fetch_row()) {
+                    $cache[(int) $row[0]] = true;
+                }
+                $res->free();
+            }
+        }
+
+        return $cache;
     }
 }
 
@@ -790,7 +825,7 @@ if (!function_exists('nj_read_catalog_rows')) {
             "SELECT nj_size, coord_tag, nj_start, nj_end
                FROM vcf_snv_nj_catalog
               WHERE kind = '" . $kind . "'
-           ORDER BY nj_size, nj_start"
+           ORDER BY nj_size, nj_start, coord_tag"
         );
         if (!$res) {
             return [];
