@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `vcf_snv_nj_catalog` (
   `nj_end` int(11) DEFAULT NULL,
   `coord_tag` varchar(16) NOT NULL DEFAULT '',
   `kind` varchar(8) NOT NULL DEFAULT 'nj',
+  `hidden` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`nj_size`, `coord_tag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

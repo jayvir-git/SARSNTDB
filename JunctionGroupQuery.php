@@ -1088,7 +1088,46 @@ if (window.JunctionQueryCharts) {
             var jump = ev.submitter && ev.submitter.classList && ev.submitter.classList.contains('nj-show');
             try {
                 sessionStorage.setItem('jqScrollY', jump ? (ev.submitter.getAttribute('data-nj-breakdown') || 'njBreakdown') : String(window.scrollY || window.pageYOffset || 0));
+                sessionStorage.setItem('jqGridState', JSON.stringify(gridState()));
             } catch (err) {}
+        });
+    }
+    // Ticking a junction reloads the page; keep each junction list's sort and scroll so it does not jump
+    // back to the top (Jim, 2026-10-22, D-83).
+    function gridState() {
+        var state = {};
+        $('.nj-datagrid[id]').each(function () {
+            var sorted = $(this).find('thead th').filter(function () {
+                return / dir-(u|d) /.test(this.className);
+            }).first();
+            state[this.id] = {
+                top: this.scrollTop,
+                col: sorted.length ? sorted.index() : -1,
+                up: sorted.length ? / dir-u /.test(sorted.get(0).className) : false
+            };
+        });
+        return state;
+    }
+    var savedGrids = null;
+    try {
+        savedGrids = JSON.parse(sessionStorage.getItem('jqGridState') || 'null');
+        sessionStorage.removeItem('jqGridState');
+    } catch (err) {}
+    if (savedGrids) {
+        $.each(savedGrids, function (id, grid) {
+            var box = document.getElementById(id);
+            if (!box || !grid) {
+                return;
+            }
+            var th = grid.col >= 0 ? $(box).find('thead tr').first().children().get(grid.col) : null;
+            if (th) {
+                // sortable.js sorts down on the first click and up on the second.
+                th.click();
+                if (grid.up) {
+                    th.click();
+                }
+            }
+            box.scrollTop = grid.top || 0;
         });
     }
     var savedScroll = null;

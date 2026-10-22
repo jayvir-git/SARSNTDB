@@ -824,7 +824,7 @@ if (!function_exists('nj_read_catalog_rows')) {
         $res = $con->query(
             "SELECT nj_size, coord_tag, nj_start, nj_end
                FROM vcf_snv_nj_catalog
-              WHERE kind = '" . $kind . "'
+              WHERE kind = '" . $kind . "' AND hidden = 0
            ORDER BY nj_size, nj_start, coord_tag"
         );
         if (!$res) {

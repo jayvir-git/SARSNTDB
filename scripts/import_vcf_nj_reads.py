@@ -617,7 +617,23 @@ def trsl_coords(paths: list[Path]) -> dict[tuple[int, str], tuple[int, int]]:
     return out
 
 
-def load_trsl(root: Path, coord_files: list[Path] | None = None) -> None:
+def hide_trsl(cfg: dict, hide_files: list[Path]) -> int:
+    """Hide TRS-L rows Jim asked to remove (size,coord_tag CSV in the packet); hidden, never deleted (D-83)."""
+    count = 0
+    for path in hide_files:
+        with path.open(newline="", encoding="utf-8-sig") as fh:
+            for row in csv.reader(fh):
+                if len(row) >= 2 and row[0].strip().isdigit():
+                    mysql_run(
+                        "UPDATE vcf_snv_nj_catalog SET hidden = 1 WHERE kind = 'tl' AND nj_size = "
+                        + str(int(row[0])) + " AND coord_tag = " + sql_str(row[1].strip()),
+                        cfg,
+                    )
+                    count += 1
+    return count
+
+
+def load_trsl(root: Path, coord_files: list[Path] | None = None, hide_files: list[Path] | None = None) -> None:
     """Add TRS-L catalog rows (kind tl) and their reads; groups without files stay without rows (shown as -1)."""
     cfg = parse_connection_php()
     coords = trsl_coords(coord_files or [])
@@ -669,6 +685,7 @@ def load_trsl(root: Path, coord_files: list[Path] | None = None) -> None:
         )
     insert_values("vcf_snv_nj_catalog", "nj_size,nj_start,nj_end,coord_tag,kind", catalog_rows, cfg)
     print("catalog tl", len(keys), "with start and end", sum(1 for key in keys if key in coords))
+    print("hidden", hide_trsl(cfg, hide_files or []))
     for code, n in sorted(added.items()):
         print(f"trsl {code} {n}")
 
@@ -688,9 +705,13 @@ def main() -> None:
     )
     parser.add_argument("--trsl-root", type=Path, default=None, help="Load TRS-L dependent junctions from this folder")
     parser.add_argument("--trsl-coords", type=Path, action="append", default=None, help="Jim's size,start,end CSV (repeatable)")
+    parser.add_argument("--trsl-hide", type=Path, action="append", default=None, help="size,coord_tag CSV of TRS-L rows to hide")
     args = parser.parse_args()
     if args.trsl_root is not None:
-        load_trsl(args.trsl_root, args.trsl_coords)
+        load_trsl(args.trsl_root, args.trsl_coords, args.trsl_hide)
+        return
+    if args.trsl_hide:
+        print("hidden", hide_trsl(parse_connection_php(), args.trsl_hide))
         return
     if args.add_catalog_reads:
         add_catalog_reads(args.nj_root or [INCOMING])
