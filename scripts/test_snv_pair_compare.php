@@ -66,7 +66,7 @@ expect($openDefaults === ['delta|COVID-ARTIC-V3', 'delta|COVID-ARTIC-V4.1'], 'De
 $split = snv_pair_build($samples, ['merge_delta' => false, 'major_only' => true, 'min_samples' => 30]);
 expect(snv_pair_find($split, 'delta|COVID-ARTIC-V3') === null, 'Merge Delta off has no combined Delta column');
 $subtype = snv_pair_find($split, 'raw:Delta (B.1.617.2-like)|COVID-ARTIC-V3');
-expect($subtype !== null && $subtype['n'] === 40 && $subtype['label'] === 'Delta (B.1.617.2-like) V3', 'Merge Delta off lists the subtype');
+expect($subtype !== null && $subtype['n'] === 40 && $subtype['label'] === 'Delta B.1.617.2 V3', 'Merge Delta off lists the subtype without -like or brackets (D-84)');
 expect($split[0]['key'] === 'raw:Delta (B.1.617.2-like)|COVID-ARTIC-V3', 'Delta subtypes stay at the top of the pair list');
 
 $ba = snv_pair_build($samples, ['merge_delta' => true, 'merge_ba' => false, 'major_only' => true, 'min_samples' => 0]);

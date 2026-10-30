@@ -95,6 +95,21 @@ if (!function_exists('vcf_snv_isolated_group_codes')) {
     }
 }
 
+if (!function_exists('vcf_snv_variant_name')) {
+    /**
+     * Variant name as shown on pages and in downloads: "Omicron (BA.1-like)" becomes "Omicron BA.1"
+     * (Jim, 2026-10-30, D-84). Display only: stored labels stay as Viridian wrote them, because they are
+     * the keys in links, saved selections and merge rules.
+     */
+    function vcf_snv_variant_name($label)
+    {
+        $name = preg_replace('/\(([^()]*)\)/', '$1', (string) $label);
+        $name = str_replace('-like', '', $name);
+
+        return trim(preg_replace('/\s+/', ' ', $name));
+    }
+}
+
 if (!function_exists('vcf_snv_group_display_label')) {
     /**
      * Jim 21 Sep: USA groups use country + state + accession.

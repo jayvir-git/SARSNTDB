@@ -424,8 +424,10 @@ if (!function_exists('nj_read_junction_hits')) {
         $inTypes = '';
         $inValues = [];
         $in = nj_read_in_clause($groupIds, $inTypes, $inValues);
+        // FORCE INDEX: after the junction loads (about 2.5M reads) MySQL started joining on group_id alone, scanning a
+        // group's reads per sample (minutes); the (group_id, sample_name, read_count) index answers it in seconds (D-84).
         $sql = 'SELECT r.nj_size, r.coord_tag, s.group_id, m.variant_label, m.primer_label, COUNT(*) AS n_num
-                  FROM vcf_snv_nj_read r
+                  FROM vcf_snv_nj_read r FORCE INDEX (idx_vcf_snv_nj_read_sample)
                   INNER JOIN vcf_snv_sample s
                     ON s.group_id = r.group_id AND s.sample_name = r.sample_name
                   INNER JOIN vcf_snv_sample_eligibility e

@@ -339,7 +339,7 @@ if (!function_exists('nj_read_variant_key')) {
 if (!function_exists('nj_read_variant_display')) {
     function nj_read_variant_display($label)
     {
-        return (string) $label === '.' ? 'No variant call (.)' : (string) $label;
+        return (string) $label === '.' ? 'No variant call (.)' : vcf_snv_variant_name($label);
     }
 }
 

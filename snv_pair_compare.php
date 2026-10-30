@@ -95,8 +95,8 @@ if (!function_exists('snv_pair_column_defs')) {
             $abbrev = nj_read_primer_abbrev($primer);
             $deltaCols[] = [
                 'key' => $key,
-                'label' => $variant . ($abbrev !== '' ? ' ' . $abbrev : ''),
-                'top' => $variant,
+                'label' => vcf_snv_variant_name($variant) . ($abbrev !== '' ? ' ' . $abbrev : ''),
+                'top' => vcf_snv_variant_name($variant),
                 'sub' => $abbrev,
                 'buckets' => ['delta'],
                 'primers' => [$primer],

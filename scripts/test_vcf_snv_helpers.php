@@ -95,6 +95,13 @@ $counts = vcf_snv_eligibility_counts_text([
 expect(strpos($counts, 'PASS∩VCF=780') !== false, "counts text $counts");
 expect(vcf_snv_eligibility_counts_text(null) === '', 'null counts empty');
 
+// Variant names as shown (D-84).
+expect(vcf_snv_variant_name('Omicron (BA.1-like)') === 'Omicron BA.1', 'brackets and -like removed');
+expect(vcf_snv_variant_name('Delta (B.1.617.2-like) +K417N') === 'Delta B.1.617.2 +K417N', 'extra mutation kept');
+expect(vcf_snv_variant_name('B.1.1.7-like+E484K') === 'B.1.1.7+E484K', 'name without brackets');
+expect(vcf_snv_variant_name('Omicron (Unassigned)') === 'Omicron Unassigned', 'unassigned');
+expect(vcf_snv_variant_name('Delta') === 'Delta', 'merged names unchanged');
+
 if ($failed) {
     echo "\n$failed failed\n";
     exit(1);

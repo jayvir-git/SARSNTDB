@@ -762,7 +762,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
                         <input id="Major" name="Major" type="checkbox" value="1"<?php echo !empty($njOptions['major_only']) ? ' checked' : ''; ?> />
                         Show only major variants
                     </label>
-                    <p class="text-muted" style="font-size:12px; margin:0;">Alpha, Delta, and Omicron. On by default. An extra mutation, such as B.1.1.7-like+E484K, stays off this list.</p>
+                    <p class="text-muted" style="font-size:12px; margin:0;">Alpha, Delta, and Omicron. On by default. An extra mutation, such as B.1.1.7+E484K, stays off this list.</p>
                 </div>
                 <div class="checkbox">
                     <label>
