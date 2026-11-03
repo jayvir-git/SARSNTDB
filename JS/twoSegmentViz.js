@@ -119,6 +119,8 @@
     };
   }
 
+  var ALT_NOTE = 'Primers with alt in the name that have no alt mate are paired with the primer of the same number without alt (its arrow is repeated on the alt line).';
+
   function primerPairInfo(name) {
     var raw = String(name || '');
     var match = raw.match(/(\d+)_(LEFT|RIGHT)(_alt\w*)?/i);
@@ -186,9 +188,9 @@
     return String(primer.direction).toUpperCase() === 'R';
   }
 
-  // An alt primer with no alt partner on the other side is used with the regular primer of the same number, so its
-  // line runs to that primer instead of the track edge (Jim, 2026-11-03, D-87). Returns the mate edges in px.
-  function altMateXs(info, groupPrimers, schemePrimers, windowRange) {
+  // An alt primer with no alt partner on the other side is used with the regular primer of the same number, so that
+  // primer's arrow is drawn on the alt line too and the pair connects normally (Jim, 2026-11-03, D-87).
+  function altMates(info, groupPrimers, schemePrimers) {
     if (!info.isAlt) {
       return [];
     }
@@ -200,14 +202,24 @@
     return (schemePrimers || []).filter(function (primer) {
       var other = primerPairInfo(primer.primer_name);
       return !other.isAlt && other.num === info.num && isLeftPrimer(primer) === hasRight;
-    }).map(function (primer) {
-      var lo = Math.min(Number(primer.coord_start), Number(primer.coord_end));
-      var hi = Math.max(Number(primer.coord_start), Number(primer.coord_end));
-      return hasLeft ? mapBreakpointPos(lo, windowRange) : mapBreakpointPos(hi + 1, windowRange);
     });
   }
 
-  function renderPairConnectors(track, laidOut, color, mateXs) {
+  function groupPrimersWithAltMates(primers, schemePrimers) {
+    return groupPrimersByPair(primers).map(function (group) {
+      var mates = altMates(group.info, group.primers, schemePrimers);
+      if (!mates.length) {
+        return group;
+      }
+      // Sorted by position so the borrowed arrow shares the alt's row instead of starting a second one.
+      var merged = group.primers.concat(mates).sort(function (a, b) {
+        return Number(a.coord_start) - Number(b.coord_start);
+      });
+      return { info: group.info, primers: merged };
+    });
+  }
+
+  function renderPairConnectors(track, laidOut, color) {
     var lefts = [];
     var rights = [];
     laidOut.forEach(function (item) {
@@ -244,12 +256,11 @@
       }
       return;
     }
-    var mateX = mateXs && mateXs.length ? mateXs[0] : null;
     lefts.forEach(function (leftItem) {
-      draw(leftItem.box.left + leftItem.box.width, mateX === null ? TRACK_WIDTH : mateX, arrowCenterY(leftItem.lane));
+      draw(leftItem.box.left + leftItem.box.width, TRACK_WIDTH, arrowCenterY(leftItem.lane));
     });
     rights.forEach(function (rightItem) {
-      draw(mateX === null ? 0 : mateX, rightItem.box.left, arrowCenterY(rightItem.lane));
+      draw(0, rightItem.box.left, arrowCenterY(rightItem.lane));
     });
   }
 
@@ -276,7 +287,7 @@
     });
   }
 
-  function appendPairTrack(row, laidOut, color, windowRange, pairLabelText, breakpointKind, skipConnectors, mateXs) {
+  function appendPairTrack(row, laidOut, color, windowRange, pairLabelText, breakpointKind, skipConnectors) {
     if (!laidOut.length) {
       return;
     }
@@ -295,7 +306,7 @@
       track.appendChild(pairLabel);
     }
     if (!skipConnectors) {
-      renderPairConnectors(track, laidOut, color, mateXs);
+      renderPairConnectors(track, laidOut, color);
     }
     renderPrimerArrows(track, laidOut, color, breakpointKind);
     row.appendChild(track);
@@ -324,7 +335,7 @@
 
   function layoutCompactPairs(primers, windowRange, schemePrimers) {
     var prepared = [];
-    groupPrimersByPair(primers).forEach(function (group) {
+    groupPrimersWithAltMates(primers, schemePrimers).forEach(function (group) {
       var items = [];
       group.primers.forEach(function (primer) {
         var box = breakpointPrimerBox(primer, windowRange);
@@ -348,19 +359,19 @@
         minX = Math.min(minX, item.box.left);
         maxX = Math.max(maxX, item.box.left + item.box.width);
       });
-      var mateXs = altMateXs(group.info, group.primers, schemePrimers, windowRange);
       if (hasLeft && !hasRight) {
-        maxX = mateXs.length ? Math.min(TRACK_WIDTH, Math.max(maxX, mateXs[0])) : TRACK_WIDTH;
+        maxX = TRACK_WIDTH;
       }
       if (hasRight && !hasLeft) {
-        minX = mateXs.length ? Math.max(0, Math.min(minX, mateXs[0])) : 0;
+        minX = 0;
       }
       prepared.push({
         items: items,
         minX: minX,
         maxX: maxX,
         num: group.info.num,
-        isAlt: group.info.isAlt
+        isAlt: group.info.isAlt,
+        key: group.info.key
       });
     });
     prepared.sort(function (a, b) {
@@ -387,7 +398,7 @@
       }
       lanes[lane] = pair.maxX;
       pair.items.forEach(function (item) {
-        laidOut.push({ primer: item.primer, box: item.box, lane: lane });
+        laidOut.push({ primer: item.primer, box: item.box, lane: lane, pairKey: pair.key });
       });
     });
     return laidOut;
@@ -632,17 +643,15 @@
       var compactTrack = row.lastChild;
       groupPrimersByPair(primers).forEach(function (group) {
         var groupLaid = compactLaid.filter(function (item) {
-          return primerPairInfo(item.primer.primer_name).key === group.info.key;
+          return item.pairKey === group.info.key;
         });
         if (groupLaid.length && compactTrack) {
-          renderPairConnectors(compactTrack, groupLaid, color,
-            altMateXs(group.info, group.primers, schemePrimers, windowRange));
+          renderPairConnectors(compactTrack, groupLaid, color);
         }
       });
     } else {
-      groupPrimersByPair(primers).forEach(function (group) {
-        appendPairTrack(row, layoutPrimerLanes(group.primers, windowRange), color, windowRange, group.info.label, breakpointKind, false,
-          altMateXs(group.info, group.primers, schemePrimers, windowRange));
+      groupPrimersWithAltMates(primers, schemePrimers).forEach(function (group) {
+        appendPairTrack(row, layoutPrimerLanes(group.primers, windowRange), color, windowRange, group.info.label, breakpointKind, false);
       });
     }
     container.appendChild(row);
@@ -740,8 +749,8 @@
     var note = document.createElement('div');
     note.className = 'tsg-primer-direction-note';
     note.textContent = primerLayout() === 'compact'
-      ? 'Compact view: pair numbers hidden. Each pair stays on its own stripe; non-overlapping pairs share a row. Pale lines connect LEFT/RIGHT mates; an alt without an alt mate connects to the regular mate; if a mate is offscreen the line runs to the edge of the track.'
-      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; an alt without an alt mate connects to the regular mate; if a mate is offscreen the line runs to the edge of the track. Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers.';
+      ? 'Compact view: pair numbers hidden. Each pair stays on its own stripe; non-overlapping pairs share a row. Pale lines connect LEFT/RIGHT mates; if a mate is offscreen the line runs to the edge of the track. ' + ALT_NOTE
+      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. ' + ALT_NOTE + ' Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers.';
     section.appendChild(note);
     container.appendChild(section);
   }
@@ -905,7 +914,7 @@
       renderBreakpointPanel(section, { id: 'snv' }, 'snv', coord, all, selected);
       var note = document.createElement('div');
       note.className = 'tsg-primer-direction-note';
-      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers. Pale lines connect primer pairs; an alt without an alt mate connects to the regular mate; offscreen mates run to the edge of the track.';
+      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers. Pale lines connect primer pairs; offscreen mates run to the edge of the track. ' + ALT_NOTE;
       section.appendChild(note);
       frag.appendChild(section);
     }
@@ -1024,7 +1033,7 @@
     breakpointPrimerBox: breakpointPrimerBox,
     primerPairInfo: primerPairInfo,
     layoutCompactPairs: layoutCompactPairs,
-    altMateXs: altMateXs,
+    altMates: altMates,
     GENOME_TOTAL: GENOME_TOTAL,
     TRACK_WIDTH: TRACK_WIDTH
   };

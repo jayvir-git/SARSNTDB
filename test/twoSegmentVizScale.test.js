@@ -107,17 +107,19 @@ var altScheme = [
   { primer_name: 'X_9_RIGHT_alt1', direction: 'L', coord_start: 2300, coord_end: 2320 }
 ];
 function altInfo(name) { return viz.primerPairInfo(name); }
-assert.deepStrictEqual(viz.altMateXs(altInfo('X_7_RIGHT_alt1'), [altScheme[2]], altScheme, altWindow),
-  [(1121 - 1001) * viz.TRACK_WIDTH / 1600],
-  'a RIGHT alt alone connects to the end of the regular LEFT');
-assert.deepStrictEqual(viz.altMateXs(altInfo('X_8_LEFT_alt1'), [altScheme[3]], altScheme, altWindow),
-  [(1800 - 1001) * viz.TRACK_WIDTH / 1600],
-  'a LEFT alt alone connects to the start of the regular RIGHT');
-assert.deepStrictEqual(viz.altMateXs(altInfo('X_9_LEFT_alt1'), [altScheme[6], altScheme[7]], altScheme, altWindow), [],
+function names(list) { return list.map(function (p) { return p.primer_name; }); }
+assert.deepStrictEqual(names(viz.altMates(altInfo('X_7_RIGHT_alt1'), [altScheme[2]], altScheme)), ['X_7_LEFT'],
+  'a RIGHT alt alone borrows the regular LEFT');
+assert.deepStrictEqual(names(viz.altMates(altInfo('X_8_LEFT_alt1'), [altScheme[3]], altScheme)), ['X_8_RIGHT'],
+  'a LEFT alt alone borrows the regular RIGHT');
+assert.deepStrictEqual(viz.altMates(altInfo('X_9_LEFT_alt1'), [altScheme[6], altScheme[7]], altScheme), [],
   'alts with both sides pair with each other');
-assert.deepStrictEqual(viz.altMateXs(altInfo('X_7_LEFT'), [altScheme[0], altScheme[1]], altScheme, altWindow), [],
+assert.deepStrictEqual(viz.altMates(altInfo('X_7_LEFT'), [altScheme[0], altScheme[1]], altScheme), [],
   'regular pairs are unchanged');
 var altCompact = viz.layoutCompactPairs(altScheme.slice(0, 3), altWindow, altScheme);
-assert.strictEqual(altCompact.length, 3, 'compact layout keeps the one-sided alt');
+var altLane = altCompact.filter(function (item) { return item.pairKey === '7_alt'; });
+assert.deepStrictEqual(names(altLane.map(function (item) { return item.primer; })).sort(), ['X_7_LEFT', 'X_7_RIGHT_alt1'],
+  'compact: the alt stripe repeats the regular LEFT arrow');
+assert.strictEqual(altLane[0].lane, altLane[1].lane, 'compact: borrowed mate shares the alt stripe');
 
 console.log('twoSegmentViz breakpoint scale assertions passed');
