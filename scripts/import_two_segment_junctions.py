@@ -1,9 +1,10 @@
-"""Add canonical (CJ) and TRS-L dependent (TL) junctions to the Two-segment structures page (Jim, 2026-11-02, D-85).
+"""Add canonical (CJ), TRS-L dependent (TL) and small-deletion NJ junctions to the Two-segment page (D-85, D-86).
 
 Reads Jim's size,start,end lists from the gitignored packets (junction coordinates are unpublished and this repo is
 public) and writes a gitignored SQL file that replaces the rows this import added before:
 
-    python scripts/import_two_segment_junctions.py --cj CJ.csv --trsl TRSL.csv [--trsl ...] [--trsl-hide HIDE.csv] --out OUT.sql
+    python scripts/import_two_segment_junctions.py --cj CJ.csv --trsl TRSL.csv [--trsl ...] [--trsl-hide HIDE.csv]
+        [--small SMALL.csv] --out OUT.sql
 
 Each structure runs from 1 to 29903 with the deletion between Jim's start (left) and end (right), so
 size = right - left + 1, as for the NJ rows. Reverse with sql/two_segment_junctions_drop.sql.
@@ -62,6 +63,7 @@ def main() -> None:
     parser.add_argument("--cj", type=Path, required=True, help="Jim's canonical list: Size,Start,End,Name")
     parser.add_argument("--trsl", type=Path, action="append", default=[], help="Jim's TRS-L size,start,end list (repeatable)")
     parser.add_argument("--trsl-hide", type=Path, action="append", default=[], help="size,coord_tag rows hidden on Junction groups")
+    parser.add_argument("--small", type=Path, default=None, help="Jim's small-deletion size,start,end list (NJ rows)")
     parser.add_argument("--out", type=Path, required=True, help="SQL file to write (keep it out of git)")
     args = parser.parse_args()
 
@@ -90,8 +92,13 @@ def main() -> None:
         lines.append(structure_sql("TL", label, start, end, 300 + i))
         kept += 1
 
+    # Small deletions (sizes under 100) are NJ rows on Junction groups; named like the other NJ rows (Jim, 2026-11-03, D-86).
+    small = sorted(read_rows(args.small)) if args.small else []
+    for i, (size, start, end, _name) in enumerate(small):
+        lines.append(structure_sql("NJ", f"NJ {start}\u2013{end} (size {size})", start, end, 100 + i))
+
     args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {args.out}: {len(read_rows(args.cj))} CJ, {kept} TRS-L ({len(trsl) - kept} hidden)")
+    print(f"wrote {args.out}: {len(read_rows(args.cj))} CJ, {kept} TRS-L ({len(trsl) - kept} hidden), {len(small)} small-deletion NJ")
 
 
 if __name__ == "__main__":
