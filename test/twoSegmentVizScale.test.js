@@ -94,4 +94,30 @@ var pangoLeft = viz.pangoMarkersForWindow({ start: 1, end: 800, breakpoint: 400 
 assert.strictEqual(pangoLeft.length, 1, 'indel at 685 is inside 1–800');
 assert.match(pangoLeft[0].label, /REF=AAAGTCATTT/, 'indel overlay keeps full REF allele');
 
+// A one-sided alt pairs with the regular primer of the same number (Jim, 2026-11-03, D-87).
+var altWindow = { start: 1001, end: 2600, breakpoint: 1800 };
+var altScheme = [
+  { primer_name: 'X_7_LEFT', direction: 'R', coord_start: 1100, coord_end: 1120 },
+  { primer_name: 'X_7_RIGHT', direction: 'L', coord_start: 1500, coord_end: 1520 },
+  { primer_name: 'X_7_RIGHT_alt1', direction: 'L', coord_start: 1530, coord_end: 1550 },
+  { primer_name: 'X_8_LEFT_alt1', direction: 'R', coord_start: 1400, coord_end: 1420 },
+  { primer_name: 'X_8_LEFT', direction: 'R', coord_start: 1410, coord_end: 1430 },
+  { primer_name: 'X_8_RIGHT', direction: 'L', coord_start: 1800, coord_end: 1820 },
+  { primer_name: 'X_9_LEFT_alt1', direction: 'R', coord_start: 1900, coord_end: 1920 },
+  { primer_name: 'X_9_RIGHT_alt1', direction: 'L', coord_start: 2300, coord_end: 2320 }
+];
+function altInfo(name) { return viz.primerPairInfo(name); }
+assert.deepStrictEqual(viz.altMateXs(altInfo('X_7_RIGHT_alt1'), [altScheme[2]], altScheme, altWindow),
+  [(1121 - 1001) * viz.TRACK_WIDTH / 1600],
+  'a RIGHT alt alone connects to the end of the regular LEFT');
+assert.deepStrictEqual(viz.altMateXs(altInfo('X_8_LEFT_alt1'), [altScheme[3]], altScheme, altWindow),
+  [(1800 - 1001) * viz.TRACK_WIDTH / 1600],
+  'a LEFT alt alone connects to the start of the regular RIGHT');
+assert.deepStrictEqual(viz.altMateXs(altInfo('X_9_LEFT_alt1'), [altScheme[6], altScheme[7]], altScheme, altWindow), [],
+  'alts with both sides pair with each other');
+assert.deepStrictEqual(viz.altMateXs(altInfo('X_7_LEFT'), [altScheme[0], altScheme[1]], altScheme, altWindow), [],
+  'regular pairs are unchanged');
+var altCompact = viz.layoutCompactPairs(altScheme.slice(0, 3), altWindow, altScheme);
+assert.strictEqual(altCompact.length, 3, 'compact layout keeps the one-sided alt');
+
 console.log('twoSegmentViz breakpoint scale assertions passed');
