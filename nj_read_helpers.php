@@ -757,7 +757,7 @@ if (!function_exists('nj_read_label_pairs')) {
 if (!function_exists('nj_read_table_kind')) {
     /**
      * Form names and labels for the three junction tables on Junction groups.
-     * cj rows are keyed by start (D-80); nj rows by size, with the start added for a repeated size;
+     * nj and cj rows are keyed by size, nj with the start added for a repeated size (D-80, D-85);
      * tl rows by size, coord_tag L plus the start for a repeated size (D-81).
      *
      * @return array<string,string>

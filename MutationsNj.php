@@ -116,7 +116,7 @@ if ($njCanonical) {
 echo '<p style="margin:6px 0;"><label><input type="checkbox" class="nj-select-all" data-nj-target="' . $njCheckName . '" /> Select all</label> ';
 echo '<button type="submit" class="btn btn-default btn-sm" name="csv" value="' . $njKind['csv'] . 'junctions">Download the checked junctions</button>';
 if ($njCanonical) {
-    echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the start and short group names, as in <code>START_Arg_Port550_NJ.csv</code>. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
+    echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names, as in <code>SIZE_Arg_Port550_NJ.csv</code>. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
 } else {
     echo ' <span class="text-muted" style="font-size:12px;">One CSV per checked junction, named with the size and short group names. Three groups download as <code>SIZE_Arg_Port550_NJ.csv</code>. When another junction has the same size, its start is added, as in <code>SIZE_START_NJ.csv</code>. Sizes under 100 are the small deletions. Each checked junction gets its group table below (up to ' . $njBreakdownMax . ').</span></p>';
 }
@@ -124,7 +124,7 @@ echo '<div class="nj-datagrid" id="' . $njCheckName . '"><table class="sortable"
 if ($njKind['kind'] === 'tl') {
     echo '<th></th><th>Size</th><th>Start</th><th>End</th>';
 } else {
-    echo $njCanonical ? '<th></th><th>Start</th><th>Size</th><th>End</th>' : '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
+    echo $njCanonical ? '<th></th><th>Size</th><th>Start</th><th>End</th>' : '<th></th><th>NJ size</th><th>Start</th><th>End</th>';
 }
 foreach ($summaryHeads as $headText) {
     echo '<th>' . htmlspecialchars($headText, ENT_QUOTES, 'UTF-8') . '</th>';
@@ -152,13 +152,7 @@ foreach ($catalog as $row) {
     echo '<td><button type="submit" class="nj-show" name="' . $njPickName . '" value="' . htmlspecialchars($pickValue, ENT_QUOTES, 'UTF-8') . '" data-nj-breakdown="' . $njBreakdownId . '">';
     echo (int) $row['nj_size'];
     echo '</button></td>';
-    if ($njCanonical) {
-        // Canonical rows are keyed by start (nj_size holds it); the size is end - start + 1, as in Jim's del_coord_cjs.csv.
-        $size = ($row['nj_start'] !== null && $row['nj_end'] !== null) ? (string) ($row['nj_end'] - $row['nj_start'] + 1) : '';
-        echo '<td>' . htmlspecialchars($size, ENT_QUOTES, 'UTF-8') . '</td>';
-    } else {
-        echo '<td>' . htmlspecialchars($start, ENT_QUOTES, 'UTF-8') . '</td>';
-    }
+    echo '<td>' . htmlspecialchars($start, ENT_QUOTES, 'UTF-8') . '</td>';
     echo '<td>' . htmlspecialchars($end, ENT_QUOTES, 'UTF-8') . '</td>';
     foreach ($njSelectedCols as $key) {
         $text = ($summaryRow === null || !isset($summaryRow['cols'][$key])) ? '-1' : (string) $summaryRow['cols'][$key];

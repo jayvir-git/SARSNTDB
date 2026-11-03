@@ -24,7 +24,7 @@ SCHEMA_SQL = ROOT / "sql" / "vcf_snv_nj.sql"
 # Samples with no junction reads in any _coord file are not analyzed (Jim, 2026-10-19).
 NO_NJ_READS_SQL = ROOT / "sql" / "vcf_snv_no_nj_reads.sql"
 INCOMING = ROOT / "_incoming" / "jim-kelley"
-# Small deletions (size,start,end) and canonical junctions (start,size,end) from Jim's 2026-10-21 lists. They live in the
+# Small deletions and canonical junctions (both size,start,end, as Jim's 2026-11-02 header says) from his 2026-10-21 lists. They live in the
 # gitignored packet, never in this public repo (junction coordinates are unpublished); moving the packet breaks the load.
 SMALL_DEL_CSV = INCOMING / "2026-10-21_small-del-canonical" / "files" / "small_del.csv"
 CANONICAL_CSV = INCOMING / "2026-10-21_small-del-canonical" / "files" / "del_coord_cjs.csv"
@@ -508,7 +508,7 @@ def load_only(
 
 def small_canonical_rows(small_csv: Path = SMALL_DEL_CSV, canonical_csv: Path = CANONICAL_CSV) -> list[tuple[int, int, int, str, str]]:
     """(nj_size, start, end, coord_tag, kind) for the catalog. Small-deletion files carry their start
-    ({base}{size}_{start}_coord.csv); canonical files are named by the start, which nj_size holds, as for 28190 (D-80)."""
+    ({base}{size}_{start}_coord.csv); canonical files are named by the size alone, as 28190 always was (D-80, D-85)."""
     rows: list[tuple[int, int, int, str, str]] = []
     for path, kind in ((small_csv, "nj"), (canonical_csv, "cj")):
         if not path.is_file():
@@ -518,10 +518,7 @@ def small_canonical_rows(small_csv: Path = SMALL_DEL_CSV, canonical_csv: Path = 
                 if len(row) < 3 or not all(cell.strip().isdigit() for cell in row[:3]):
                     continue
                 a, b, c = (int(cell) for cell in row[:3])
-                if kind == "nj":
-                    rows.append((a, b, c, str(b), "nj"))
-                else:
-                    rows.append((a, a, c, "", "cj"))
+                rows.append((a, b, c, str(b) if kind == "nj" else "", kind))
     return rows
 
 

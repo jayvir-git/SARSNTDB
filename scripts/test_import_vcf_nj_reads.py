@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory() as tmp:
     canonical_csv.write_text("\ufeff5001,60,5060\n", encoding="utf-8")
     rows = njimp.small_canonical_rows(small_csv, canonical_csv)
 expect(rows[0] == (40, 1001, 1040, "1001", "nj"), "small deletion keyed by size, tagged by start")
-expect(rows[2] == (5001, 5001, 5060, "", "cj"), "canonical junction keyed by start")
+expect(rows[2] == (5001, 60, 5060, "", "cj"), "canonical junction is size, start, end like the others (D-85)")
 njimp.ALLOWED = {(r[0], r[3]) for r in rows}
 expect(parse_coord_name("NJ_all_40_1001_coord.csv") == ("NJ-PRJNA708324", 40, "1001"), "small deletion file loads")
 expect(parse_coord_name("UT_6000_5001_coord.csv") == ("UT_6000", 5001, ""), "Utah canonical file loads")

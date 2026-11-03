@@ -49,6 +49,9 @@ if (!function_exists('tsg_junction_kind_label')) {
         if ($k === 'NJ') {
             return 'NJ';
         }
+        if ($k === 'TL') {
+            return 'TRS-L';
+        }
 
         return 'CJ';
     }

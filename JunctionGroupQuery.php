@@ -393,7 +393,6 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
             $csvKind = substr($csvKind, 2);
         }
     }
-    $csvCanonical = $csvTable['kind'] === 'cj';
     $csvCatalog = $csvTable['kind'] === 'cj' ? $cjCatalog : ($csvTable['kind'] === 'tl' ? $tlCatalog : $njCatalog);
     $csvSummary = $csvTable['kind'] === 'cj' ? $cjSummary : ($csvTable['kind'] === 'tl' ? $tlSummary : $njSummary);
     $csvCheckName = $csvTable['check'];
@@ -458,7 +457,7 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
     header('Content-Disposition: attachment; filename="' . $csvName . '"');
     echo "\xEF\xBB\xBF";
     if ($csvKind === 'summary') {
-        $sizeHead = $csvCanonical ? ['Start', 'Size'] : ($csvTable['kind'] === 'tl' ? ['Size', 'start'] : ['NJ Size', 'start']);
+        $sizeHead = $csvTable['kind'] === 'nj' ? ['NJ Size', 'start'] : ['Size', 'start'];
         $csvHead = [$sizeHead[0], $sizeHead[1], 'end'];
         foreach ($njSelectedCols as $csvCol) {
             $colHead = nj_read_column_heads($csvCol, $njBy);
@@ -468,9 +467,6 @@ if (isset($_GET['csv']) && (string) $_GET['csv'] !== '' && isset($con) && $con i
         echo nj_read_csv_line($csvHead) . "\n";
         foreach ($csvSummary as $csvRow) {
             $second = $csvRow['nj_start'] === null ? '' : $csvRow['nj_start'];
-            if ($csvCanonical) {
-                $second = ($csvRow['nj_start'] === null || $csvRow['nj_end'] === null) ? '' : $csvRow['nj_end'] - $csvRow['nj_start'] + 1;
-            }
             $csvLine = [$csvRow['nj_size'], $second, $csvRow['nj_end'] === null ? '' : $csvRow['nj_end']];
             foreach ($njSelectedCols as $csvCol) {
                 $csvLine[] = isset($csvRow['cols'][$csvCol]) ? $csvRow['cols'][$csvCol] : '-1';

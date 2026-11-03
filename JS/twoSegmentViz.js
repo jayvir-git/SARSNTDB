@@ -731,6 +731,9 @@
     var t = document.createElement('div');
     t.className = 'tsg-row-title';
     var jk = entry.junction_kind ? String(entry.junction_kind).toUpperCase() : '';
+    if (jk === 'TL') {
+      jk = 'TRS-L';
+    }
     var kindPart = jk ? ', ' + jk : '';
     t.textContent = entry.name + ' (' + entry.subtype + kindPart + ', id ' + entry.id + ')';
     block.appendChild(t);

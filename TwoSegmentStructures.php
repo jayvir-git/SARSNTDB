@@ -42,6 +42,11 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             if (tsg_is_illustrative_junction($row)) {
                 continue;
             }
+            // The five early "Demo:" CJ rows used approximate body starts; Jim's canonical list replaces them on this
+            // page (D-85). They stay in the table because Repeats search still matches their repeats.
+            if (strpos((string) $row['notes'], 'Demo:') === 0) {
+                continue;
+            }
             $row['subtype'] = tsg_sg_label(isset($row['subtype']) ? $row['subtype'] : '');
             $row['name'] = tsg_sg_label(isset($row['name']) ? $row['name'] : '');
             if (array_key_exists('repeat_seq', $row)) {
@@ -106,7 +111,9 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             top: 0;
             text-align: center;
         }
-        .tsg-table-wrap { max-height: 420px; overflow: auto; margin-top: 8px; }
+        .tsg-table-wrap { max-height: 420px; overflow: auto; margin-top: 4px; margin-bottom: 14px; }
+        .tsg-kind-head { margin: 14px 0 0 0; font-weight: bold; }
+        table.sortable thead th { cursor: pointer; }
         .tsg-table { font-size: 12px; }
         .tsg-table td, .tsg-table th { vertical-align: middle !important; }
         .tsg-mono { font-family: Consolas, monospace; font-size: 11px; }
@@ -191,14 +198,33 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             <button type="button" class="btn btn-primary" onclick="TwoSegmentViz.showSelected();">Show</button>
         </div>
 
+        <?php
+        // Three tables like Junction groups: non-canonical, canonical, TRS-L dependent (Jim, 2026-11-02, D-85).
+        $tsgTables = [
+            'NJ' => 'Non-canonical junctions (NJ)',
+            'CJ' => 'Canonical junctions',
+            'TRS-L' => 'TRS-L dependent junctions',
+        ];
+        ?>
+        <p class="text-muted" style="font-size:12px; margin:0;">Click a column heading to sort. Size is right &minus; left + 1. Check rows in any of the tables, then click Show.</p>
+        <?php foreach ($tsgTables as $tsgKind => $tsgTitle) : ?>
+            <?php
+            $kindRows = array_values(array_filter($rows, function ($row) use ($tsgKind) {
+                return tsg_junction_kind_label($row) === $tsgKind;
+            }));
+            if (!$kindRows) {
+                continue;
+            }
+            ?>
+        <p class="tsg-kind-head"><?php echo htmlspecialchars($tsgTitle, ENT_QUOTES, 'UTF-8'); ?> (<?php echo count($kindRows); ?>)</p>
         <div class="tsg-table-wrap">
-            <table class="table table-bordered table-striped tsg-table">
+            <table class="table table-bordered table-striped tsg-table sortable">
                 <thead>
                     <tr class="darkheader">
                         <th style="width:36px;">Sel.</th>
                         <th>Subtype</th>
-                        <th>CJ / NJ</th>
                         <th>Name</th>
+                        <th>Size</th>
                         <th>from</th>
                         <th>left</th>
                         <th>right</th>
@@ -208,14 +234,14 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($rows as $row) : ?>
+                <?php foreach ($kindRows as $row) : ?>
                     <tr>
                         <td class="text-center">
                             <input type="checkbox" name="tsg_sel[]" value="<?php echo (int) $row['id']; ?>" />
                         </td>
                         <td><?php echo htmlspecialchars($row['subtype'], ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars(tsg_junction_kind_label($row), ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="text-right"><?php echo (int) $row['coord_right'] - (int) $row['coord_left'] + 1; ?></td>
                         <td class="text-right"><?php echo (int) $row['coord_from']; ?></td>
                         <td class="text-right"><?php echo (int) $row['coord_left']; ?></td>
                         <td class="text-right"><?php echo (int) $row['coord_right']; ?></td>
@@ -240,6 +266,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
                 </tbody>
             </table>
         </div>
+        <?php endforeach; ?>
         <?php endif; ?>
 
         <div id="tsg-viz-wrap">
@@ -258,8 +285,9 @@ window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
 window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
+<script src="./sortable.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261019-repeat"></script>
+<script src="JS/twoSegmentViz.js?v=20261102-trsl"></script>
 <script>
 (function ($) {
     $(function () {
