@@ -1,10 +1,10 @@
-"""Add canonical (CJ), TRS-L dependent (TL) and small-deletion NJ junctions to the Two-segment page (D-85, D-86).
+"""Add canonical (CJ), TRS-L dependent (TL) and NJ junctions to the Two-segment page (D-85, D-86, D-88).
 
 Reads Jim's size,start,end lists from the gitignored packets (junction coordinates are unpublished and this repo is
 public) and writes a gitignored SQL file that replaces the rows this import added before:
 
     python scripts/import_two_segment_junctions.py --cj CJ.csv --trsl TRSL.csv [--trsl ...] [--trsl-hide HIDE.csv]
-        [--small SMALL.csv] --out OUT.sql
+        [--small SMALL.csv] [--nj NJ_TABLE.csv] --out OUT.sql
 
 Each structure runs from 1 to 29903 with the deletion between Jim's start (left) and end (right), so
 size = right - left + 1, as for the NJ rows. Reverse with sql/two_segment_junctions_drop.sql.
@@ -58,12 +58,24 @@ def structure_sql(kind: str, name: str, start: int, end: int, order: int) -> str
     )
 
 
+def nj_table_sql(name: str, start: int, end: int, repeat: str, order: int) -> str:
+    """Like structure_sql, but skips a junction the page already has (the NJ-table-small rows from import_primer_beds.py)."""
+    return (
+        "INSERT INTO `two_segment_structure` "
+        "(`subtype`,`junction_kind`,`name`,`coord_from`,`coord_left`,`coord_right`,`coord_to`,`repeat_seq`,`link_url`,`notes`,`display_order`) "
+        f"SELECT 'sgmRNA','NJ',{sql_str(name)},1,{start},{end},{GENOME_END},{sql_str(repeat or None)},NULL,{sql_str(NOTE)},{order} "
+        "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `two_segment_structure` "
+        f"WHERE `junction_kind` = 'NJ' AND `coord_left` = {start} AND `coord_right` = {end});"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cj", type=Path, required=True, help="Jim's canonical list: Size,Start,End,Name")
     parser.add_argument("--trsl", type=Path, action="append", default=[], help="Jim's TRS-L size,start,end list (repeatable)")
     parser.add_argument("--trsl-hide", type=Path, action="append", default=[], help="size,coord_tag rows hidden on Junction groups")
     parser.add_argument("--small", type=Path, default=None, help="Jim's small-deletion size,start,end list (NJ rows)")
+    parser.add_argument("--nj", type=Path, default=None, help="Jim's NJ table: Size,NJ Start,NJ End,Repeat (the Click a Junction list)")
     parser.add_argument("--out", type=Path, required=True, help="SQL file to write (keep it out of git)")
     args = parser.parse_args()
 
@@ -97,8 +109,15 @@ def main() -> None:
     for i, (size, start, end, _name) in enumerate(small):
         lines.append(structure_sql("NJ", f"NJ {start}\u2013{end} (size {size})", start, end, 100 + i))
 
+    # Every Click a Junction NJ belongs on this page too, not only the NJ-table-small ones (Jim, 2026-11-04, D-88).
+    nj = sorted(read_rows(args.nj)) if args.nj else []
+    for i, (size, start, end, repeat) in enumerate(nj):
+        dna = repeat.upper().replace("U", "T")
+        lines.append(nj_table_sql(f"NJ {start}–{end} (size {size})", start, end, dna, 500 + i))
+
     args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {args.out}: {len(read_rows(args.cj))} CJ, {kept} TRS-L ({len(trsl) - kept} hidden), {len(small)} small-deletion NJ")
+    print(f"wrote {args.out}: {len(read_rows(args.cj))} CJ, {kept} TRS-L ({len(trsl) - kept} hidden), {len(small)} small-deletion NJ,"
+          f" {len(nj)} NJ-table rows (rows already on the page are skipped when the SQL runs)")
 
 
 if __name__ == "__main__":
