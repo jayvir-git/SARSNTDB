@@ -484,6 +484,10 @@
       if (!isFinite(coord) || coord < windowRange.start || coord > windowRange.end) {
         return;
       }
+      // Nearby markers are SNVs only: indel labels are too long for the track (Jim, 2026-11-04, D-89).
+      if (marker.kind === 'indel') {
+        return;
+      }
       var key = snvAlleleKey(marker);
       if (focalKey && key === focalKey) {
         return;
@@ -492,19 +496,12 @@
         return;
       }
       seen[key] = true;
-      var kind = marker.kind === 'indel' ? 'indel' : 'snv';
-      var label = marker.label;
-      if (!label) {
-        label = kind === 'indel'
-          ? (coord + ' REF=' + String(marker.reference || '') + ' ALT=' + String(marker.alternate || ''))
-          : (String(marker.reference || '') + coord + String(marker.alternate || ''));
-      }
       out.push({
         coordinate: coord,
         reference: String(marker.reference || '').toUpperCase(),
         alternate: String(marker.alternate || '').toUpperCase(),
-        label: label,
-        kind: kind,
+        label: marker.label || (String(marker.reference || '') + coord + String(marker.alternate || '')),
+        kind: 'snv',
         source: 'pango'
       });
     });
@@ -978,6 +975,44 @@
     }
   }
 
+  // View choices are remembered in this browser (localStorage, no sign-in) until history is cleared;
+  // a layout or nearby value in the URL still wins (Jim, 2026-11-04, D-89).
+  var PREFS_KEY = 'sarsntdb.primerView';
+
+  function readViewPrefs() {
+    try {
+      var stored = JSON.parse(global.localStorage.getItem(PREFS_KEY) || '{}');
+      return stored && typeof stored === 'object' ? stored : {};
+    } catch (ignore) {
+      return {};
+    }
+  }
+
+  function saveViewPrefs() {
+    try {
+      global.localStorage.setItem(PREFS_KEY, JSON.stringify({
+        layout: primerLayout(),
+        nearby: nearbySnvsEnabled()
+      }));
+    } catch (ignore) {}
+  }
+
+  function applyStoredViewPrefs() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch (ignore) {
+      return;
+    }
+    var prefs = readViewPrefs();
+    if (!params.has('layout') && (prefs.layout === 'compact' || prefs.layout === 'detailed')) {
+      setPrimerLayout(prefs.layout, false);
+    }
+    if (!params.has('nearby') && prefs.nearby === false) {
+      setNearbySnvs(false, false);
+    }
+  }
+
   function bindLayoutToggle() {
     var params;
     try {
@@ -995,12 +1030,14 @@
       detailed.checked = primerLayout() !== 'compact';
       detailed.addEventListener('change', function () {
         setPrimerLayout(this.checked ? 'detailed' : 'compact', true);
+        saveViewPrefs();
       });
     }
     if (compact) {
       compact.checked = primerLayout() === 'compact';
       compact.addEventListener('change', function () {
         setPrimerLayout(this.checked ? 'compact' : 'detailed', true);
+        saveViewPrefs();
       });
     }
     var nearby = document.getElementById('tsgShowNearbySnvs');
@@ -1008,11 +1045,14 @@
       nearby.checked = nearbySnvsEnabled();
       nearby.addEventListener('change', function () {
         setNearbySnvs(this.checked, true);
+        saveViewPrefs();
       });
     }
   }
 
   if (typeof document !== 'undefined') {
+    // Before the page's first draw, which runs right after this script on SnvPrimerView.php.
+    applyStoredViewPrefs();
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', bindLayoutToggle);
     } else {

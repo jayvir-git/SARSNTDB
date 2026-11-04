@@ -91,8 +91,7 @@ var pangoRight = viz.pangoMarkersForWindow(rightWindow);
 assert.strictEqual(pangoRight.length, 1, 'only Pango markers inside the window should be kept');
 assert.strictEqual(pangoRight[0].label, 'C23202A');
 var pangoLeft = viz.pangoMarkersForWindow({ start: 1, end: 800, breakpoint: 400 });
-assert.strictEqual(pangoLeft.length, 1, 'indel at 685 is inside 1–800');
-assert.match(pangoLeft[0].label, /REF=AAAGTCATTT/, 'indel overlay keeps full REF allele');
+assert.strictEqual(pangoLeft.length, 0, 'Pango indels are not drawn as nearby markers (D-89)');
 
 // A one-sided alt pairs with the regular primer of the same number (Jim, 2026-11-03, D-87).
 var altWindow = { start: 1001, end: 2600, breakpoint: 1800 };
