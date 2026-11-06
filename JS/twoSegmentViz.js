@@ -672,7 +672,7 @@
         backgroundColor: '#ffffff',
         pixelRatio: 2,
         filter: function (node) {
-          return !(node.classList && node.classList.contains('tsg-png-btn'));
+          return !(node.classList && (node.classList.contains('tsg-png-btn') || node.classList.contains('tsg-hover-line') || node.classList.contains('tsg-hover-label')));
         }
       }).then(function (dataUrl) {
         var link = document.createElement('a');
@@ -720,8 +720,55 @@
     });
     addPngButton(panel, (breakpointKind === 'snv' ? 'snv' : 'structure_' + entry.id + '_' + breakpointKind) +
       '_' + breakpoint + '_primers.png');
+    addHoverCoordinate(panel, windowRange);
     container.appendChild(panel);
   }
+
+  // Genome coordinate under the mouse, with its offset from the breakpoint (Jim, Zoom 2026-11-06 00:03:01).
+  function hoverCoordAt(x, windowRange) {
+    var span = windowRange.end - windowRange.start + 1;
+    var coord = windowRange.start + Math.floor((x * span) / TRACK_WIDTH);
+    return Math.min(windowRange.end, Math.max(windowRange.start, coord));
+  }
+
+  function addHoverCoordinate(panel, windowRange) {
+    var line = document.createElement('div');
+    line.className = 'tsg-hover-line';
+    var label = document.createElement('div');
+    label.className = 'tsg-hover-label';
+    panel.appendChild(line);
+    panel.appendChild(label);
+    function hide() {
+      line.style.display = 'none';
+      label.style.display = 'none';
+    }
+    hide();
+    panel.addEventListener('mousemove', function (ev) {
+      var axis = panel.querySelector('.tsg-breakpoint-axis');
+      var rect = panel.getBoundingClientRect();
+      var x = ev.clientX - rect.left;
+      var y = ev.clientY - rect.top;
+      var top = axis ? axis.offsetTop : 0;
+      if (x < 0 || x >= TRACK_WIDTH || y < top) {
+        hide();
+        return;
+      }
+      var coord = hoverCoordAt(x, windowRange);
+      var offset = coord - windowRange.breakpoint;
+      var px = mapBreakpointPos(coord + 0.5, windowRange);
+      line.style.left = px + 'px';
+      line.style.top = top + 'px';
+      line.style.display = 'block';
+      label.textContent = coord + (offset === 0 ? ' (breakpoint)' : ' (' + (offset > 0 ? '+' : '−') + Math.abs(offset) + ' nt)');
+      label.style.top = top + 'px';
+      label.style.display = 'block';
+      var w = label.offsetWidth;
+      label.style.left = (px + 6 + w > TRACK_WIDTH ? px - 6 - w : px + 6) + 'px';
+    });
+    panel.addEventListener('mouseleave', hide);
+  }
+
+  global.TSG_hoverCoordAt = hoverCoordAt;
 
   function renderBreakpointPanels(container, entry) {
     var selected = global.TSG_SELECTED_SCHEMES || [];

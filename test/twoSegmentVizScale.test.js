@@ -121,4 +121,10 @@ assert.deepStrictEqual(names(altLane.map(function (item) { return item.primer; }
   'compact: the alt stripe repeats the regular LEFT arrow');
 assert.strictEqual(altLane[0].lane, altLane[1].lane, 'compact: borrowed mate shares the alt stripe');
 
+// Hover readout maps the mouse x back to a genome coordinate (Jim, Zoom 2026-11-06).
+var hover = global.window.TSG_hoverCoordAt;
+assert.strictEqual(hover(0, leftWindow), 4449, 'left edge is the window start');
+assert.strictEqual(hover(viz.TRACK_WIDTH - 0.01, leftWindow), 6049, 'right edge is the window end');
+assert.strictEqual(hover(viz.breakpointPrimerBox({ coord_start: 5249, coord_end: 5249 }, leftWindow).left + 0.01, leftWindow), 5249, 'x of the breakpoint maps back to it');
+
 console.log('twoSegmentViz breakpoint scale assertions passed');

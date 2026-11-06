@@ -111,6 +111,7 @@
 }
 
 .tsg-breakpoint-panel {
+  position: relative;
   width: 900px;
   margin-bottom: 16px;
   padding: 10px 0;
@@ -376,4 +377,28 @@
   border: 1px solid #ffc107;
   border-radius: 4px;
   max-width: 900px;
+}
+
+/* Hover readout on primer breakpoint panels (Jim, Zoom 2026-11-06). */
+.tsg-hover-line {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid rgba(29, 41, 57, 0.55);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.tsg-hover-label {
+  position: absolute;
+  z-index: 7;
+  padding: 1px 5px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(29, 41, 57, 0.85);
+  border-radius: 3px;
+  pointer-events: none;
 }

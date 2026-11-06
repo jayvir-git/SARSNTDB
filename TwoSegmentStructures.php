@@ -97,7 +97,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     <title>Two-segment structures — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20260917-pango" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20261106-hover" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -287,7 +287,7 @@ window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="./sortable.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261104-prefs"></script>
+<script src="JS/twoSegmentViz.js?v=20261106-hover"></script>
 <script>
 (function ($) {
     $(function () {
