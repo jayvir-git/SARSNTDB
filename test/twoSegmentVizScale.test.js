@@ -127,4 +127,11 @@ assert.strictEqual(hover(0, leftWindow), 4449, 'left edge is the window start');
 assert.strictEqual(hover(viz.TRACK_WIDTH - 0.01, leftWindow), 6049, 'right edge is the window end');
 assert.strictEqual(hover(viz.breakpointPrimerBox({ coord_start: 5249, coord_end: 5249 }, leftWindow).left + 0.01, leftWindow), 5249, 'x of the breakpoint maps back to it');
 
+// Nearby SNV labels never overlap: close labels go to new lanes, far ones reuse lane 0 (D-91).
+var lanes = global.window.TSG_layoutLabelLanes([
+  { x: 100, text: 'C21575T' }, { x: 105, text: 'G21987A' }, { x: 110, text: 'T22000C' }, { x: 400, text: 'A22813G' }
+]);
+assert.strictEqual(lanes.lanes, 3, 'three close labels need three lanes');
+assert.deepStrictEqual(lanes.items.map(function (e) { return e.lane; }), [0, 1, 2, 0]);
+
 console.log('twoSegmentViz breakpoint scale assertions passed');

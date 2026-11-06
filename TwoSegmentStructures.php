@@ -21,6 +21,8 @@ $showNearbySnvs = !(isset($_GET['nearby']) && (string) $_GET['nearby'] === '0');
 $overlaySnvs = [];
 $overlayGroup = vcf_snv_overlay_group_code();
 $overlayMinAf = vcf_snv_request_min_af();
+$nearbyPct = vcf_snv_request_nearby_pct();
+$pangoAltPct = pango_request_min_alt_pct();
 $pangoOverlay = [];
 
 if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
@@ -86,8 +88,8 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     } else {
         $primerDbError = 'Primer-arrow tables are not installed. Import sql/primer_arrows.sql.';
     }
-    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, 1.0);
-    $pangoOverlay = pango_overlay_markers($con);
+    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, $nearbyPct);
+    $pangoOverlay = pango_overlay_markers($con, $pangoAltPct);
 }
 ?>
 <!DOCTYPE html>
@@ -97,7 +99,7 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
     <title>Two-segment structures — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20261106-hover" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20261106-nearby" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -180,9 +182,15 @@ if (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
             <span class="tsg-nearby-toggle">
                 <label class="checkbox-inline">
                     <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
-                    Show nearby SNVs (≥1%; Pango markers dashed) from
+                    Show nearby SNVs
                 </label>
+                in &ge;<input type="number" name="NearbyPct" min="0" max="100" step="any" class="form-control input-sm tsg-pct-input"
+                       value="<?php echo htmlspecialchars(tsg_pct_text($nearbyPct), ENT_QUOTES, 'UTF-8'); ?>"
+                       title="Minimum % of analyzed samples in the group (default 10)" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }" />% of
                 <?php echo vcf_snv_overlay_group_select($con, $overlayGroup); ?>
+                ; Pango markers (dashed) with ALT in &ge;<input type="number" name="PangoAlt" min="0" max="100" step="any" class="form-control input-sm tsg-pct-input"
+                       value="<?php echo htmlspecialchars(tsg_pct_text($pangoAltPct), ENT_QUOTES, 'UTF-8'); ?>"
+                       title="Minimum ALT reads / depth for a Pango designation marker (default 95)" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }" />% of reads
                 <input type="hidden" name="MinAf" value="<?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>" />
             </span>
             <span class="help-block" style="margin-bottom:0;">
@@ -282,12 +290,13 @@ window.TSG_SELECTED_SCHEMES = <?php echo tsg_json_for_script($selectedPrimerSche
 window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
 window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
+window.TSG_NEARBY_PCT = <?php echo json_encode($nearbyPct); ?>;
 window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="./sortable.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261106-hover"></script>
+<script src="JS/twoSegmentViz.js?v=20261106-nearby"></script>
 <script>
 (function ($) {
     $(function () {

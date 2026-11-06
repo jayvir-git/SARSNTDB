@@ -402,3 +402,11 @@
   border-radius: 3px;
   pointer-events: none;
 }
+
+/* Nearby SNV % and Pango ALT % boxes on the primer views (D-91). */
+.tsg-pct-input {
+  display: inline-block;
+  width: 62px;
+  margin: 0 2px;
+  padding: 2px 4px;
+}

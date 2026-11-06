@@ -28,6 +28,8 @@ if (isset($_GET['primer']) && ctype_digit((string) $_GET['primer'])) {
 $primerWindow = 800;
 $overlayGroup = vcf_snv_overlay_group_code();
 $overlayMinAf = vcf_snv_request_min_af();
+$nearbyPct = vcf_snv_request_nearby_pct();
+$pangoAltPct = pango_request_min_alt_pct();
 $overlayGroupLabel = '';
 $primerLayout = (isset($_GET['layout']) && $_GET['layout'] === 'compact') ? 'compact' : 'detailed';
 $primerSchemes = [];
@@ -44,11 +46,11 @@ $primerDbError = null;
 if ($coord < 1 || $coord > 29903) {
     $dbError = 'Pass a genome coordinate in ?coord= (1–29903). Example: SnvPrimerView.php?coord=23202';
 } elseif (isset($con) && $con instanceof mysqli && !$con->connect_errno) {
-    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, 1.0,
+    $overlaySnvs = vcf_snv_overlay_variants($con, $overlayGroup, $overlayMinAf, $nearbyPct,
         max(1, $coord - $primerWindow), min(29903, $coord + $primerWindow));
     $overlayGroupRow = vcf_snv_group_row($con, $overlayGroup);
     $overlayGroupLabel = $overlayGroupRow !== null ? (string) $overlayGroupRow['label'] : '';
-    $pangoOverlay = pango_overlay_markers($con);
+    $pangoOverlay = pango_overlay_markers($con, $pangoAltPct);
     if ($variantKind === 'repeat') {
         // No Pango lookup for a repeat position.
     } elseif ($variantKind === 'indel') {
@@ -117,7 +119,7 @@ foreach ($snvPrimers as $primer) {
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?> — primers — SARSNTDB</title>
     <link rel="stylesheet" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="style.css" />
-    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20261106-hover" />
+    <link rel="stylesheet" type="text/css" href="two_segment_viz.css?v=20261106-nearby" />
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <?php include __DIR__ . '/Navigation.php'; ?>
@@ -137,8 +139,8 @@ foreach ($snvPrimers as $primer) {
             of this <?php echo $kindWord; ?>
             (same window idea as junction primer arrows).
             Pale dotted lines are other SNVs in <strong><?php echo htmlspecialchars($overlayGroupLabel !== '' ? $overlayGroupLabel : $overlayGroup, ENT_QUOTES, 'UTF-8'); ?></strong>
-            (≥1% of analyzed samples, AF ≥ <?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>); change the group below.
-            Blue-gray dashed lines are published Pango designation markers in the window.
+            (≥<?php echo htmlspecialchars(tsg_pct_text($nearbyPct), ENT_QUOTES, 'UTF-8'); ?>% of analyzed samples, AF ≥ <?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>); change the group below.
+            Blue-gray dashed lines are published Pango designation markers in the window whose ALT base is in ≥<?php echo htmlspecialchars(tsg_pct_text($pangoAltPct), ENT_QUOTES, 'UTF-8'); ?>% of reads.
             See the <a href="PangoMarkers.php">Pango markers</a> page for the full tables.
             <a href="MutationsSearch.php">Back to Mutations search</a>.
         </p>
@@ -223,9 +225,15 @@ foreach ($snvPrimers as $primer) {
             <span class="tsg-nearby-toggle">
                 <label class="checkbox-inline">
                     <input type="checkbox" id="tsgShowNearbySnvs"<?php echo $showNearbySnvs ? ' checked' : ''; ?> />
-                    Show nearby SNVs (≥1%; Pango markers dashed) from
+                    Show nearby SNVs
                 </label>
+                in &ge;<input type="number" name="NearbyPct" min="0" max="100" step="any" class="form-control input-sm tsg-pct-input"
+                       value="<?php echo htmlspecialchars(tsg_pct_text($nearbyPct), ENT_QUOTES, 'UTF-8'); ?>"
+                       title="Minimum % of analyzed samples in the group (default 10)" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }" />% of
                 <?php echo vcf_snv_overlay_group_select($con, $overlayGroup); ?>
+                ; Pango markers (dashed) with ALT in &ge;<input type="number" name="PangoAlt" min="0" max="100" step="any" class="form-control input-sm tsg-pct-input"
+                       value="<?php echo htmlspecialchars(tsg_pct_text($pangoAltPct), ENT_QUOTES, 'UTF-8'); ?>"
+                       title="Minimum ALT reads / depth for a Pango designation marker (default 95)" onchange="if (this.form.requestSubmit) { this.form.requestSubmit(); } else { this.form.submit(); }" />% of reads
                 <input type="hidden" name="MinAf" value="<?php echo htmlspecialchars((string) $overlayMinAf, ENT_QUOTES, 'UTF-8'); ?>" />
             </span>
             <?php if ($primersByScheme) : ?>
@@ -265,11 +273,12 @@ window.TSG_PRIMER_WINDOW = <?php echo (int) $primerWindow; ?>;
 window.TSG_PRIMER_LAYOUT = <?php echo tsg_json_for_script($primerLayout); ?>;
 window.TSG_SELECTED_PRIMER_ID = <?php echo tsg_json_for_script($selectedPrimerId); ?>;
 window.TSG_NEARBY_SNVS = <?php echo tsg_json_for_script($overlaySnvs); ?>;
+window.TSG_NEARBY_PCT = <?php echo json_encode($nearbyPct); ?>;
 window.TSG_PANGO_MARKERS = <?php echo tsg_json_for_script($pangoOverlay); ?>;
 window.TSG_SHOW_NEARBY_SNVS = <?php echo $showNearbySnvs ? 'true' : 'false'; ?>;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
-<script src="JS/twoSegmentViz.js?v=20261106-hover"></script>
+<script src="JS/twoSegmentViz.js?v=20261106-nearby"></script>
 <script>
 (function () {
     var sel = document.getElementById('tsgPrimerSelect');

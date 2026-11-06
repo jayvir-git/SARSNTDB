@@ -372,6 +372,22 @@ if (!function_exists('vcf_snv_request_min_af')) {
     }
 }
 
+if (!function_exists('vcf_snv_request_nearby_pct')) {
+    /**
+     * Minimum % of analyzed samples for nearby SNVs on the primer views (?NearbyPct=).
+     * Default 10: at 1% the labels overlapped (Jim, 2026-11-06, D-91).
+     */
+    function vcf_snv_request_nearby_pct()
+    {
+        $pct = 10.0;
+        if (isset($_GET['NearbyPct']) && $_GET['NearbyPct'] !== '' && is_numeric($_GET['NearbyPct'])) {
+            $pct = (float) $_GET['NearbyPct'];
+        }
+
+        return max(0.0, min(100.0, $pct));
+    }
+}
+
 if (!function_exists('vcf_snv_fetch_groups')) {
     /**
      * @return list<array<string,mixed>>

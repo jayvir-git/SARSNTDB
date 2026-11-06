@@ -432,16 +432,66 @@ if (!function_exists('pango_indel_groups_at_coord')) {
     }
 }
 
+if (!function_exists('pango_request_min_alt_pct')) {
+    /**
+     * Minimum ALT share of reads (adalt / dp) for Pango markers on the primer views (?PangoAlt=).
+     * Default 95: only markers where nearly every read has the ALT base (Jim, 2026-11-06, D-91).
+     */
+    function pango_request_min_alt_pct()
+    {
+        $pct = 95.0;
+        if (isset($_GET['PangoAlt']) && $_GET['PangoAlt'] !== '' && is_numeric($_GET['PangoAlt'])) {
+            $pct = (float) $_GET['PangoAlt'];
+        }
+
+        return max(0.0, min(100.0, $pct));
+    }
+}
+
+if (!function_exists('pango_alt_pct_keys')) {
+    /**
+     * Allele keys with at least one lineage row whose ALT share (adalt / dp) is >= $minAltPct.
+     *
+     * @return array<string,bool>
+     */
+    function pango_alt_pct_keys(mysqli $con, $table, $minAltPct)
+    {
+        $keys = [];
+        $table = $table === 'pango_indel_marker' ? 'pango_indel_marker' : 'snv_pango_marker';
+        $stmt = $con->prepare('SELECT DISTINCT coordinate, reference, alternate FROM ' . $table .
+            ' WHERE dp > 0 AND 100 * adalt / dp >= ?');
+        if (!$stmt) {
+            return $keys;
+        }
+        $min = (float) $minAltPct;
+        $stmt->bind_param('d', $min);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($res && ($row = $res->fetch_assoc())) {
+            $keys[snv_pango_key($row['coordinate'], $row['reference'], $row['alternate'])] = true;
+        }
+        $stmt->close();
+
+        return $keys;
+    }
+}
+
 if (!function_exists('pango_overlay_markers')) {
     /**
      * Published Pango SNVs and indels for primer-window guides (not group observations).
+     * With $minAltPct > 0 only markers with ALT >= that % of reads in some lineage are kept (D-91).
      *
      * @return list<array{coordinate:int,reference:string,alternate:string,kind:string,label:string,source:string}>
      */
-    function pango_overlay_markers(mysqli $con)
+    function pango_overlay_markers(mysqli $con, $minAltPct = 0.0)
     {
         $out = [];
+        $snvKeys = $minAltPct > 0 ? pango_alt_pct_keys($con, 'snv_pango_marker', $minAltPct) : null;
+        $indelKeys = $minAltPct > 0 && pango_indel_table_exists($con) ? pango_alt_pct_keys($con, 'pango_indel_marker', $minAltPct) : null;
         foreach (snv_pango_all_groups($con) as $row) {
+            if ($snvKeys !== null && !isset($snvKeys[snv_pango_key($row['coordinate'], $row['reference'], $row['alternate'])])) {
+                continue;
+            }
             $out[] = [
                 'coordinate' => $row['coordinate'],
                 'reference' => $row['reference'],
@@ -452,6 +502,9 @@ if (!function_exists('pango_overlay_markers')) {
             ];
         }
         foreach (pango_indel_all_groups($con) as $row) {
+            if ($indelKeys !== null && !isset($indelKeys[snv_pango_key($row['coordinate'], $row['reference'], $row['alternate'])])) {
+                continue;
+            }
             $out[] = [
                 'coordinate' => $row['coordinate'],
                 'reference' => $row['reference'],

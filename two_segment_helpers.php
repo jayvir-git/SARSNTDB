@@ -404,6 +404,14 @@ if (!function_exists('tsg_utf8ize')) {
     }
 }
 
+if (!function_exists('tsg_pct_text')) {
+    /** A percent for a form field: 10 not 10.00, 2.5 stays 2.5. */
+    function tsg_pct_text($pct)
+    {
+        return rtrim(rtrim(number_format((float) $pct, 2, '.', ''), '0'), '.');
+    }
+}
+
 if (!function_exists('tsg_json_for_script')) {
     /**
      * json_encode for an inline <script> assignment. Never echoes empty/false

@@ -416,6 +416,12 @@
       String(snv.alternate || '').toUpperCase();
   }
 
+  // Nearby SNV floor set on the page (?NearbyPct=, default 10; D-91).
+  function nearbyPctText() {
+    var pct = Number(global.TSG_NEARBY_PCT);
+    return isFinite(pct) ? String(Math.round(pct * 100) / 100) : '10';
+  }
+
   function nearbySnvsForWindow(windowRange) {
     var all = global.TSG_NEARBY_SNVS || [];
     var focalKey = '';
@@ -447,7 +453,7 @@
         alternate: String(snv.alternate || '').toUpperCase(),
         label: snv.label || (String(snv.reference || '') + coord + String(snv.alternate || '')),
         source: snv.source || 'original_mutations',
-        source_label: snv.source_label || 'selected group (≥1%)'
+        source_label: snv.source_label || ('selected group (≥' + nearbyPctText() + '%)')
       });
     });
     out.sort(function (a, b) {
@@ -464,7 +470,7 @@
     if (item.source === 'pango') {
       return label + ' — Pango designation marker';
     }
-    return label + ' — ' + (item.source_label || 'selected group (≥1%)');
+    return label + ' — ' + (item.source_label || ('selected group (≥' + nearbyPctText() + '%)'));
   }
 
   function pangoMarkersForWindow(windowRange) {
@@ -570,23 +576,46 @@
     if (!items.length) {
       return;
     }
+    var placed = layoutLabelLanes(items.map(function (item) {
+      return { item: item, x: mapBreakpointPos(item.coordinate, windowRange), text: item.label };
+    }));
     var row = document.createElement('div');
     row.className = 'tsg-nearby-snv-labels';
-    var lanes = Math.min(3, items.length);
-    row.style.height = (lanes * 12) + 'px';
-    items.forEach(function (item, i) {
+    row.style.height = (placed.lanes * 11 + 1) + 'px';
+    placed.items.forEach(function (p) {
       var lab = document.createElement('span');
-      lab.className = item.source === 'pango'
+      lab.className = p.item.source === 'pango'
         ? 'tsg-nearby-snv-label tsg-pango-marker-label'
         : 'tsg-nearby-snv-label';
-      lab.style.left = mapBreakpointPos(item.coordinate, windowRange) + 'px';
-      lab.style.top = ((i % lanes) * 11) + 'px';
-      lab.textContent = item.label;
-      lab.title = overlayGuideTitle(item);
+      lab.style.left = p.x + 'px';
+      lab.style.top = (p.lane * 11) + 'px';
+      lab.textContent = p.text;
+      lab.title = overlayGuideTitle(p.item);
       row.appendChild(lab);
     });
     container.appendChild(row);
   }
+
+  // Labels sorted by position, each in the first lane where it does not touch the previous label;
+  // lanes are added as needed so names never overlap (Jim, 2026-11-06, D-91). Labels are centred on x.
+  var LABEL_CHAR_PX = 5.5;
+  var LABEL_GAP_PX = 4;
+  function layoutLabelLanes(entries) {
+    var sorted = entries.slice().sort(function (a, b) { return a.x - b.x; });
+    var laneEnds = [];
+    sorted.forEach(function (e) {
+      var half = (String(e.text).length * LABEL_CHAR_PX) / 2;
+      var lane = 0;
+      while (lane < laneEnds.length && laneEnds[lane] + LABEL_GAP_PX > e.x - half) {
+        lane++;
+      }
+      laneEnds[lane] = e.x + half;
+      e.lane = lane;
+    });
+    return { items: sorted, lanes: Math.max(1, laneEnds.length) };
+  }
+
+  global.TSG_layoutLabelLanes = layoutLabelLanes;
 
   function renderBreakpointAxis(container, windowRange) {
     var axis = document.createElement('div');
@@ -794,7 +823,7 @@
     note.className = 'tsg-primer-direction-note';
     note.textContent = primerLayout() === 'compact'
       ? 'Compact view: pair numbers hidden. Each pair stays on its own stripe; non-overlapping pairs share a row. Pale lines connect LEFT/RIGHT mates; if a mate is offscreen the line runs to the edge of the track. ' + ALT_NOTE
-      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. ' + ALT_NOTE + ' Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers.';
+      : 'Detailed view: each LEFT/RIGHT pair is on its own line (alts on a separate line). Pale lines connect mates; if a mate is offscreen the line runs to the edge of the track. ' + ALT_NOTE + ' Arrow direction: LEFT / + points right; RIGHT / \u2212 points left. The dashed guide marks the breakpoint. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 ' + nearbyPctText() + '% of analyzed samples). Blue-gray dashed lines are published Pango designation markers whose ALT base is in nearly all reads (threshold above).';
     section.appendChild(note);
     container.appendChild(section);
   }
@@ -958,7 +987,7 @@
       renderBreakpointPanel(section, { id: 'snv' }, 'snv', coord, all, selected);
       var note = document.createElement('div');
       note.className = 'tsg-primer-direction-note';
-      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 1% of analyzed samples). Blue-gray dashed lines are published Pango designation markers. Pale lines connect primer pairs; offscreen mates run to the edge of the track. ' + ALT_NOTE;
+      note.textContent = 'Dashed guide is the selected SNV. Pale dotted lines are nearby SNVs from the group chosen above (\u2265 ' + nearbyPctText() + '% of analyzed samples). Blue-gray dashed lines are published Pango designation markers whose ALT base is in nearly all reads (threshold above). Pale lines connect primer pairs; offscreen mates run to the edge of the track. ' + ALT_NOTE;
       section.appendChild(note);
       frag.appendChild(section);
     }
